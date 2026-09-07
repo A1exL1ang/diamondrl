@@ -1,0 +1,49 @@
+[project]
+name = "diamondrl"
+version = "0.1.0"
+description = "Diffusion world model"
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "gymnasium>=1.2.3",
+    "matplotlib>=3.11.1",
+    "numpy>=2.4.2",
+    "torch>=2.13.0",
+    "torchvision>=0.28.0",
+    "tqdm>=4.70.0",
+]
+
+[dependency-groups]
+dev = [
+    "basedpyright",
+    "ruff",
+    "ipykernel>=7.1.0",
+    "ipython>=9.9.0",
+] 
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu126" }
+torchvision = { index = "pytorch-cu126" }
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.basedpyright]
+pythonVersion = "3.11"
+typeCheckingMode = "standard" 
+include = ["src"]
