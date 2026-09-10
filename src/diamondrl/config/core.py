@@ -16,6 +16,10 @@ class DiffusionConfig:
     group_size: int
     cond_dim: int
 
+    rho: float
+    sigma_max: int
+    sigma_min: int
+
     denoising_steps: int
 
 
