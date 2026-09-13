@@ -2,42 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
-class AdaGNConv(nn.Module):
-    def __init__(self, group_size: int, in_ch: int, out_ch: int, cond_dim: int):
-        super().__init__()
-        self.norm = nn.GroupNorm(in_ch // group_size, in_ch, affine=False)
-        self.ada = nn.Linear(cond_dim, 2 * in_ch)
-        self.conv = nn.Conv2d(in_ch, out_ch, 3, padding=1)
-
-    def forward(self, x: torch.Tensor, cond_emb: torch.Tensor) -> torch.Tensor:
-        h = self.norm(x)  # (B, C, H, W)
-        scale, shift = self.ada(cond_emb).chunk(2, dim=-1)  # (B, C)
-
-        # Note: input is centered at 0 so add 1 to scale for initialization reasons
-        h = h * (1 + scale[:, :, None, None]) + shift[:, :, None, None]
-
-        h = F.silu(h)
-        return self.conv(h)
-
-
-class ResBlock(nn.Module):
-    def __init__(self, group_size: int, in_ch: int, out_ch: int, cond_dim: int):
-        super().__init__()
-
-        self.units = nn.ModuleList(
-            [
-                AdaGNConv(group_size, in_ch, out_ch, cond_dim),
-                AdaGNConv(group_size, out_ch, out_ch, cond_dim),
-            ]
-        )
-        self.skip = nn.Identity() if in_ch == out_ch else nn.Conv2d(in_ch, out_ch, 1)
-
-    def forward(self, x: torch.Tensor, cond_emb: torch.Tensor) -> torch.Tensor:
-        h = x
-        for unit in self.units:
-            h = unit(h, cond_emb)
-        return self.skip(x) + h
+from diamondrl.models.common import ResBlockCond
 
 
 class DownBlock(nn.Module):
@@ -46,8 +11,8 @@ class DownBlock(nn.Module):
 
         self.res_blocks = nn.ModuleList(
             [
-                ResBlock(group_size, in_ch, block_ch, cond_dim),
-                ResBlock(group_size, block_ch, block_ch, cond_dim),
+                ResBlockCond(group_size, in_ch, block_ch, cond_dim),
+                ResBlockCond(group_size, block_ch, block_ch, cond_dim),
             ]
         )
         # (h // 2, w // 2)
@@ -74,8 +39,8 @@ class UpBlock(nn.Module):
 
         self.res_blocks = nn.ModuleList(
             [
-                ResBlock(group_size, in_ch, block_ch, cond_dim),
-                ResBlock(group_size, block_ch, block_ch, cond_dim),
+                ResBlockCond(group_size, in_ch, block_ch, cond_dim),
+                ResBlockCond(group_size, block_ch, block_ch, cond_dim),
             ]
         )
 
@@ -102,7 +67,9 @@ class Unet(nn.Module):
         cond_dim: int,
     ):
         super().__init__()
-        assert len(enc_dec_channels) >= 1, "should have at least 1 encoder & decoder"
+
+        if len(enc_dec_channels) < 1:
+            raise ValueError("should have at least 1 encoder & decoder")
 
         # Increase number of channels
         self.inp_proj = nn.Conv2d(inp_ch, inp_proj_ch, 3, padding=1)
@@ -126,8 +93,8 @@ class Unet(nn.Module):
         # Midcoder
         self.midcoder = nn.ModuleList(
             [
-                ResBlock(group_size, enc_dec_channels[-1], midcoder_ch, cond_dim),
-                ResBlock(group_size, midcoder_ch, midcoder_ch, cond_dim),
+                ResBlockCond(group_size, enc_dec_channels[-1], midcoder_ch, cond_dim),
+                ResBlockCond(group_size, midcoder_ch, midcoder_ch, cond_dim),
             ]
         )
 
