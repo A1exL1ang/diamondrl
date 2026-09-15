@@ -22,7 +22,7 @@ class RolloutBatch:
     the "roll" steps to be padding which might be good for short trajectories.
     """
 
-    obs: torch.Tensor  # (B, ctx + roll, C, H, W)
+    obs_stack: torch.Tensor  # (B, ctx + roll, C, H, W)
     actions: torch.Tensor  # (B, ctx + roll - 1)
     rewards: torch.Tensor  # (B, ctx + roll - 1)
     terminations: torch.Tensor  # (B, ctx + roll - 1)
@@ -35,7 +35,7 @@ class RolloutBatch:
         assert all(b.ctx == batches[0].ctx for b in batches), "ctx should be consistent"
 
         return cls(
-            obs=torch.cat([b.obs for b in batches]),
+            obs_stack=torch.cat([b.obs_stack for b in batches]),
             actions=torch.cat([b.actions for b in batches]),
             rewards=torch.cat([b.rewards for b in batches]),
             terminations=torch.cat([b.terminations for b in batches]),
@@ -49,7 +49,7 @@ class MaskedSequenceBatch:
     Supports left padding and suffix is not guarenteed to be valid
     """
 
-    obs: torch.Tensor  # (B, L + 1, C, H, W)
+    obs_stack: torch.Tensor  # (B, L + 1, C, H, W)
     actions: torch.Tensor  # (B, L)
     rewards: torch.Tensor  # (B, L)
     terminations: torch.Tensor  # (B, L)
@@ -60,7 +60,7 @@ class MaskedSequenceBatch:
         assert batches, "batches should exist"
 
         return cls(
-            obs=torch.cat([b.obs for b in batches]),
+            obs_stack=torch.cat([b.obs_stack for b in batches]),
             actions=torch.cat([b.actions for b in batches]),
             rewards=torch.cat([b.rewards for b in batches]),
             terminations=torch.cat([b.terminations for b in batches]),
@@ -103,7 +103,9 @@ class Episode:
         )
 
         # (n, W, C, H, W) * (n, W, 1, 1, 1)
-        obs = self.observations[safe_indices_obs] * good_obs[:, :, None, None, None]
+        obs_stack = (
+            self.observations[safe_indices_obs] * good_obs[:, :, None, None, None]
+        )
 
         # (n, W-1) * (n, W-1) with invalid ones zeroed out
         actions = self.actions[safe_indices_transition] * good_transition
@@ -111,7 +113,7 @@ class Episode:
         terminations = self.terminations[safe_indices_transition] * good_transition
 
         return {
-            "obs": obs,
+            "obs_stack": obs_stack,
             "actions": actions,
             "rewards": rewards,
             "terminations": terminations,
@@ -151,7 +153,7 @@ class Episode:
         data = self.gather(indices)
 
         return RolloutBatch(
-            obs=data["obs"],
+            obs_stack=data["obs_stack"],
             actions=data["actions"],
             rewards=data["rewards"],
             terminations=data["terminations"],
@@ -176,7 +178,7 @@ class Episode:
         data = self.gather(indices)
 
         return MaskedSequenceBatch(
-            obs=data["obs"],
+            obs_stack=data["obs_stack"],
             actions=data["actions"],
             rewards=data["rewards"],
             terminations=data["terminations"],

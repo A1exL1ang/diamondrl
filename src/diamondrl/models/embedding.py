@@ -29,21 +29,28 @@ class FourierEncoding(nn.Module):
 
 
 class CondEmbedder(nn.Module):
-    def __init__(self, cond_dim: int, num_classes: int):
+    def __init__(self, cond_dim: int, ctx_steps: int, num_classes: int):
         super().__init__()
-        assert cond_dim % 2 == 0, "emb dim should be even"
+        if cond_dim % 2 != 0:
+            raise ValueError(f"cond_dim {cond_dim} should be even")
+        if cond_dim % ctx_steps != 0:
+            raise ValueError(
+                f"cond_dim {cond_dim} should be a multiple of ctx_steps {ctx_steps}"
+            )
 
         self.sigma_emb = FourierEncoding(cond_dim)
-        self.number_emb = nn.Embedding(num_classes, cond_dim)
+        self.action_emb = nn.Embedding(num_classes, cond_dim // ctx_steps)
 
         self.cond_mlp = nn.Sequential(
             nn.Linear(cond_dim, cond_dim), nn.SiLU(), nn.Linear(cond_dim, cond_dim)
         )
 
     def forward(
-        self, sigma_transformed: torch.Tensor, number: torch.Tensor
+        self, sigma_transformed: torch.Tensor, actions: torch.Tensor
     ) -> torch.Tensor:
         # Sigma transformed and number are (B,)
-        cond_emb = self.sigma_emb(sigma_transformed) + self.number_emb(number)
+        cond_emb = self.sigma_emb(sigma_transformed) + self.action_emb(actions).flatten(
+            start_dim=1
+        )
         cond_emb = self.cond_mlp(cond_emb)
         return cond_emb

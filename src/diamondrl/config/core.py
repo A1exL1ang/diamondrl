@@ -5,7 +5,7 @@ from diamondrl.config.env import EnvConfig
 
 @dataclass
 class DiffusionConfig:
-    sigma_data: float
+    obs_shape: tuple[int, int, int]
 
     inp_ch: int
     inp_proj_ch: int
@@ -17,8 +17,12 @@ class DiffusionConfig:
     cond_dim: int
 
     rho: float
-    sigma_max: int
-    sigma_min: int
+
+    sigma_data: float
+    sigma_off: float
+
+    sigma_max: float
+    sigma_min: float
 
     denoising_steps: int
 
