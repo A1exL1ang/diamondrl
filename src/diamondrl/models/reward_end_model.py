@@ -50,24 +50,24 @@ class RewardEndModel(nn.Module):
 
     def forward(
         self,
-        obs_seq: torch.Tensor,
+        obs_ctx_stk: torch.Tensor,
         action_seq: torch.Tensor,
-        next_obs_seq: torch.Tensor,
+        next_obs_stk: torch.Tensor,
         lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
     ) -> tuple[torch.Tensor, torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         """
-        obs_seq: (B, T, C, H, W)
+        obs_ctx_stk: (B, T, C, H, W)
         action_seq: (B, T)
         next_obs_seq: (B, T, C, H, W)
         lstm_state: ((1, B, dim), (1, B, dim)) where the 1 denotes the layer
                     Note: batch first only applies to input/output and not hidden
         """
-        batch, seq = obs_seq.shape[:2]
-        obs_seq = obs_seq.flatten(start_dim=0, end_dim=1)
+        batch, seq = obs_ctx_stk.shape[:2]
+        obs_ctx_stk = obs_ctx_stk.flatten(start_dim=0, end_dim=1)
         action_seq = action_seq.flatten(start_dim=0, end_dim=1)
-        next_obs_seq = next_obs_seq.flatten(start_dim=0, end_dim=1)
+        next_obs_stk = next_obs_stk.flatten(start_dim=0, end_dim=1)
 
-        enc = torch.cat([obs_seq, next_obs_seq], dim=1)
+        enc = torch.cat([obs_ctx_stk, next_obs_stk], dim=1)
         cond_emb = self.action_emb(action_seq)
 
         enc = self.inp_proj(enc)
@@ -83,4 +83,6 @@ class RewardEndModel(nn.Module):
         out, next_hidden = self.lstm(enc, lstm_state)
 
         result = self.head(out)
+
+        # (B, T, logit_dim)
         return result[..., :3], result[..., 3:], next_hidden
