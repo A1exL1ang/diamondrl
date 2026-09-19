@@ -59,6 +59,9 @@ class ActorCriticModel(nn.Module):
     def forward(
         self, obs: torch.Tensor, lstm_state: tuple[torch.Tensor, torch.Tensor] | None
     ) -> tuple[torch.Tensor, torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
+        """
+        values is (B,)
+        """
         enc = self.inp_proj(obs)
 
         for block, potential_downsample in zip(
@@ -69,7 +72,7 @@ class ActorCriticModel(nn.Module):
 
         h_out, c_out = self.lstm_cell(enc.flatten(start_dim=1), lstm_state)
 
-        policy = self.policy_head(h_out)
-        value = self.value_head(h_out)
+        policies = self.policy_head(h_out)
+        values = self.value_head(h_out)
 
-        return (policy, value, (h_out, c_out))
+        return policies, values.squeeze(1), (h_out, c_out)
