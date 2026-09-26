@@ -39,4 +39,4 @@ class NextObsModel:
             self.sigma_max_ode,
             self.sigma_min_ode,
             self.steps,
-        )
+        ).clamp(min=-1.0, max=+1.0)
