@@ -46,7 +46,6 @@ def rl_loss(
     log_probs_all_act = F.log_softmax(traj.policy_logits, dim=-1)
 
     # (B, H, A) gather across A
-    probs = probs_all_act.gather(dim=2, index=traj.actions.unsqueeze(2)).squeeze(2)
     log_probs = log_probs_all_act.gather(
         dim=2, index=traj.actions.unsqueeze(2)
     ).squeeze(2)
@@ -59,7 +58,9 @@ def rl_loss(
         (((traj.obs_values[:, :-1] - lamb_ret) ** 2) * valid_mask).sum() / num_valid
     )
 
-    average_entropy = (-probs * log_probs * valid_mask).sum() / num_valid
+    average_entropy = (
+        (-probs_all_act * log_probs_all_act).sum(dim=2) * valid_mask
+    ).sum() / num_valid
     loss_entropy = -weight_entropy * average_entropy
 
     loss_total = loss_policy + loss_value + loss_entropy
