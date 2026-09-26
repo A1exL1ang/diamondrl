@@ -6,7 +6,7 @@ from diamondrl.data.episode import Episode, MaskedSequenceBatch, RolloutBatch
 
 
 class ReplayBuffer:
-    def __init__(self, sample_weights: list[float]):
+    def __init__(self, sample_weights: tuple[float, ...]):
         self.episodes: dict[int, Episode] = {}
         self.sample_weights = sample_weights
 

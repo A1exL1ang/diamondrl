@@ -29,7 +29,7 @@ class FourierEncoding(nn.Module):
 
 
 class CondEmbedder(nn.Module):
-    def __init__(self, cond_dim: int, ctx_steps: int, num_classes: int):
+    def __init__(self, cond_dim: int, ctx_steps: int, num_actions: int):
         super().__init__()
         if cond_dim % 2 != 0:
             raise ValueError(f"cond_dim {cond_dim} should be even")
@@ -39,7 +39,7 @@ class CondEmbedder(nn.Module):
             )
 
         self.sigma_emb = FourierEncoding(cond_dim)
-        self.action_emb = nn.Embedding(num_classes, cond_dim // ctx_steps)
+        self.action_emb = nn.Embedding(num_actions, cond_dim // ctx_steps)
 
         self.cond_mlp = nn.Sequential(
             nn.Linear(cond_dim, cond_dim), nn.SiLU(), nn.Linear(cond_dim, cond_dim)

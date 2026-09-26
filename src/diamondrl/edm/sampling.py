@@ -10,10 +10,12 @@ def sampler(
     actions: torch.Tensor,
     obs_shape: tuple[int, int, int],
     rho: float,
-    sigma_max: float,
-    sigma_min: float,
+    sigma_max_ode: float,
+    sigma_min_ode: float,
     steps: int,
 ) -> torch.Tensor:
+    # TODO: swap sigma max min
+
     """
     obs_shape is for a single obs
     """
@@ -22,20 +24,25 @@ def sampler(
 
     device = next(denoiser.parameters()).device
     x: Tensor = torch.normal(
-        mean=0.0, std=sigma_max, size=(obs_ctx_cat.shape[0], *obs_shape), device=device
+        mean=0.0,
+        std=sigma_max_ode,
+        size=(obs_ctx_cat.shape[0], *obs_shape),
+        device=device,
     )
 
     sigmas = (
         [
             (
-                sigma_max ** (1 / rho)
-                + i / (steps - 1) * (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))
+                sigma_max_ode ** (1 / rho)
+                + i
+                / (steps - 1)
+                * (sigma_min_ode ** (1 / rho) - sigma_max_ode ** (1 / rho))
             )
             ** rho
             for i in range(steps)
         ]
         if steps > 1
-        else [sigma_max]
+        else [sigma_max_ode]
     )
     sigmas = torch.tensor(sigmas + [0.0], device=device)
 

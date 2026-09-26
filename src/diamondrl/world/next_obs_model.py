@@ -10,15 +10,16 @@ class NextObsModel:
         denoiser: Denoiser,
         obs_shape: tuple[int, int, int],
         rho: float,
-        sigma_max: float,
-        sigma_min: float,
+        sigma_max_ode: float,
+        sigma_min_ode: float,
         steps: int,
     ):
+        # TODO: swap sigma max min
         self.denoiser = denoiser
         self.obs_shape = obs_shape
         self.rho = rho
-        self.sigma_max = sigma_max
-        self.sigma_min = sigma_min
+        self.sigma_max_ode = sigma_max_ode
+        self.sigma_min_ode = sigma_min_ode
         self.steps = steps
 
     def next_obs_sample(
@@ -27,8 +28,7 @@ class NextObsModel:
         """
         obs_ctx_buff: (B, T, C, H, W)
         """
-        batch, seq, ch = obs_ctx_stack.shape[:3]
-        obs_ctx_cat = obs_ctx_stack.reshape((batch, seq * ch, *obs_ctx_stack.shape[3:]))
+        obs_ctx_cat = obs_ctx_stack.flatten(1, 2)
 
         return sampler(
             self.denoiser,
@@ -36,7 +36,7 @@ class NextObsModel:
             actions,
             self.obs_shape,
             self.rho,
-            self.sigma_max,
-            self.sigma_min,
+            self.sigma_max_ode,
+            self.sigma_min_ode,
             self.steps,
         )

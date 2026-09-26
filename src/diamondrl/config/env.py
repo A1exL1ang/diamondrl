@@ -12,7 +12,7 @@ class EnvConfig:
 
 @dataclass
 class AtariEnvConfig(EnvConfig):
+    rescaled_shape: tuple[int, int, int]
     game: str
-    max_noop: int = 30
-    frameskip: int = 4
-    shape: tuple[int, int, int] = (3, 64, 64)
+    max_noop: int
+    frameskip: int

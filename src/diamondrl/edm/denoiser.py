@@ -27,11 +27,11 @@ class Denoiser(nn.Module):
         self,
         obs_ctx_cat: torch.Tensor,
         noisy_x: torch.Tensor,
-        sigma_cond: torch.Tensor,
+        sigma_original: torch.Tensor,
         actions: torch.Tensor,
     ) -> torch.Tensor:
         # Combine with sigma_off to get the real sigma and then rescale
-        sigma_true = torch.sqrt(sigma_cond**2 + self.sigma_off**2)
+        sigma_true = torch.sqrt(sigma_original**2 + self.sigma_off**2)
         sigma_transformed = 0.25 * torch.log(sigma_true)
 
         c_in = 1 / torch.sqrt(self.sigma_data**2 + sigma_true**2)

@@ -47,6 +47,8 @@ class AbstractEnv(ABC):
             terminated: Whether the episode ended due to a terminal state.
             truncated: Whether the episode ended due to a time/resource limit.
             info: Additional debugging or logging information.
+
+        info["game_end"] must return the true value of whether the game ended or not
         """
 
     @abstractmethod

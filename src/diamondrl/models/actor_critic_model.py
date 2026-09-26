@@ -13,8 +13,8 @@ class ActorCriticModel(nn.Module):
         self,
         inp_shape: tuple[int, int, int],
         inp_proj_ch: int,
-        channels: list[int],
-        downsample_after: list[bool],
+        channels: tuple[int, ...],
+        downsample_after: tuple[bool, ...],
         lstm_hidden: int,
         num_actions: int,
         group_size: int,
@@ -31,7 +31,7 @@ class ActorCriticModel(nn.Module):
         final_h, final_w = inp_shape[1:]
 
         for prev_ch, cur_ch, do_down in zip(
-            [inp_proj_ch] + channels[:-1], channels, downsample_after, strict=True
+            (inp_proj_ch,) + channels[:-1], channels, downsample_after, strict=True
         ):
             self.blocks.append(ResBlockSingleBasic(group_size, prev_ch, cur_ch))
             self.potential_downsamples.append(
