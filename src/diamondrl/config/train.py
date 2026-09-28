@@ -12,7 +12,7 @@ class CollectionConfig:
 
 
 @dataclass
-class DiffusionTrainConfig:
+class DenoiserTrainConfig:
     steps_init: int
     steps_per_epoch: int
     batch_size: int
@@ -64,7 +64,7 @@ class TrainConfig:
     epochs_after_collection: int
 
     collection: CollectionConfig
-    diffusion: DiffusionTrainConfig
+    denoiser: DenoiserTrainConfig
     reward_end: RewardEndTrainConfig
     actor_critic: ActorCriticTrainConfig
     rl: RLConfig

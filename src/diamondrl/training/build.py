@@ -1,83 +1,22 @@
 from dataclasses import dataclass
-from typing import Any
-
-import torch
-import torch.nn as nn
-from torch.optim import AdamW
-from torch.optim.lr_scheduler import LinearLR
 
 from diamondrl.config.core import Config
-from diamondrl.edm.denoiser import Denoiser
 from diamondrl.env.base import AbstractEnv
-from diamondrl.models.actor_critic_model import ActorCriticModel
-from diamondrl.models.embedding import CondEmbedder
-from diamondrl.models.reward_end_model import RewardEndModel
-from diamondrl.models.unet import Unet
+from diamondrl.modules.embedding import CondEmbedder
+from diamondrl.modules.unet import Unet
+from diamondrl.rl.actor_critic import ActorCriticModel
+from diamondrl.training.optim import ModelOptimizer, Optimizers
+from diamondrl.world.denoiser import Denoiser
 from diamondrl.world.next_obs_model import NextObsModel
+from diamondrl.world.reward_end_model import RewardEndModel
 
 
 @dataclass
 class Agent:
     denoiser: Denoiser
     next_obs_model: NextObsModel
-    reward_end_model: RewardEndModel
-    actor_critic_model: ActorCriticModel
-
-
-class ModelOptimizer:
-    def __init__(
-        self,
-        model: nn.Module,
-        lr: float,
-        weight_decay: float,
-        warmup_steps: int,
-        max_grad_norm: float,
-    ):
-        self.model = model
-
-        self.opt = AdamW(
-            model.parameters(),
-            lr=lr,
-            weight_decay=weight_decay,
-        )
-        self.schedule = LinearLR(
-            self.opt,
-            start_factor=1 / warmup_steps,
-            end_factor=1.0,
-            total_iters=warmup_steps,
-        )
-        self.max_grad_norm = max_grad_norm
-        self.num_updates = 0
-
-    def update(self, loss: torch.Tensor) -> torch.Tensor:
-        self.opt.zero_grad(set_to_none=True)
-        loss.backward()
-        grad_norm = nn.utils.clip_grad_norm_(
-            self.model.parameters(), self.max_grad_norm
-        )
-        self.opt.step()
-        self.schedule.step()
-        self.num_updates += 1
-        return grad_norm
-
-    def state_dict(self) -> dict[str, Any]:
-        return {
-            "opt": self.opt.state_dict(),
-            "schedule": self.schedule.state_dict(),
-            "num_updates": self.num_updates,
-        }
-
-    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        self.opt.load_state_dict(state_dict["opt"])
-        self.schedule.load_state_dict(state_dict["schedule"])
-        self.num_updates = state_dict["num_updates"]
-
-
-@dataclass
-class Optimizers:
-    denoiser: ModelOptimizer
-    reward_end: ModelOptimizer
-    actor_critic: ModelOptimizer
+    reward_end: RewardEndModel
+    actor_critic: ActorCriticModel
 
 
 def build_agent(cfg: Config, env: AbstractEnv) -> Agent:
@@ -89,53 +28,53 @@ def build_agent(cfg: Config, env: AbstractEnv) -> Agent:
 
     u_net = Unet(
         inp_ch=frame_ch * (cfg.world.ctx_frames + 1),
-        inp_proj_ch=cfg.diffusion.inp_proj_ch,
-        midcoder_ch=cfg.diffusion.midcoder_ch,
-        enc_dec_channels=cfg.diffusion.enc_dec_channels,
+        inp_proj_ch=cfg.denoiser.inp_proj_ch,
+        midcoder_ch=cfg.denoiser.midcoder_ch,
+        enc_dec_channels=cfg.denoiser.enc_dec_channels,
         out_ch=frame_ch,
-        group_size=cfg.diffusion.group_size,
-        cond_dim=cfg.diffusion.cond_dim,
+        group_size=cfg.denoiser.group_size,
+        cond_dim=cfg.denoiser.cond_dim,
     )
 
     cond_embedder = CondEmbedder(
-        cond_dim=cfg.diffusion.cond_dim,
+        cond_dim=cfg.denoiser.cond_dim,
         ctx_steps=cfg.world.ctx_frames,
         num_actions=num_actions,
     )
 
     denoiser = Denoiser(
-        edm_f_net=u_net,
+        net=u_net,
         cond_embedder=cond_embedder,
-        sigma_off=cfg.diffusion.sigma_off,
-        sigma_data=cfg.diffusion.sigma_data,
+        sigma_off=cfg.denoiser.sigma_off,
+        sigma_data=cfg.denoiser.sigma_data,
     )
 
     next_obs_model = NextObsModel(
         denoiser=denoiser,
         obs_shape=(frame_ch, frame_h, frame_w),
-        rho=cfg.diffusion.rho,
-        sigma_max_ode=cfg.diffusion.sigma_max_ode,
-        sigma_min_ode=cfg.diffusion.sigma_min_ode,
-        steps=cfg.diffusion.denoising_steps,
+        rho=cfg.denoiser.rho,
+        sigma_min_ode=cfg.denoiser.sigma_min_ode,
+        sigma_max_ode=cfg.denoiser.sigma_max_ode,
+        denoising_steps=cfg.denoiser.denoising_steps,
     )
 
-    reward_end_model = RewardEndModel(
+    reward_end = RewardEndModel(
         inp_shape=(frame_ch * 2, frame_h, frame_w),
         inp_proj_ch=cfg.reward_end.inp_proj_ch,
         channels=cfg.reward_end.channels,
         downsample_after=cfg.reward_end.downsample_after,
-        lstm_hidden=cfg.reward_end.lstm_hidden,
+        lstm_dim=cfg.reward_end.lstm_dim,
         group_size=cfg.reward_end.group_size,
         num_actions=num_actions,
         cond_dim=cfg.reward_end.cond_dim,
     )
 
-    actor_critic_model = ActorCriticModel(
+    actor_critic = ActorCriticModel(
         inp_shape=(frame_ch, frame_h, frame_w),
         inp_proj_ch=cfg.actor_critic.inp_proj_ch,
         channels=cfg.actor_critic.channels,
         downsample_after=cfg.actor_critic.downsample_after,
-        lstm_hidden=cfg.actor_critic.lstm_hidden,
+        lstm_dim=cfg.actor_critic.lstm_dim,
         num_actions=num_actions,
         group_size=cfg.actor_critic.group_size,
     )
@@ -143,28 +82,28 @@ def build_agent(cfg: Config, env: AbstractEnv) -> Agent:
     return Agent(
         denoiser=denoiser,
         next_obs_model=next_obs_model,
-        reward_end_model=reward_end_model,
-        actor_critic_model=actor_critic_model,
+        reward_end=reward_end,
+        actor_critic=actor_critic,
     )
 
 
 def build_optimizers(cfg: Config, agent: Agent) -> Optimizers:
     denoiser_optimizer = ModelOptimizer(
         model=agent.denoiser,
-        lr=cfg.train.diffusion.lr,
-        weight_decay=cfg.train.diffusion.weight_decay,
-        warmup_steps=cfg.train.diffusion.warmup_steps,
-        max_grad_norm=cfg.train.diffusion.max_grad_norm,
+        lr=cfg.train.denoiser.lr,
+        weight_decay=cfg.train.denoiser.weight_decay,
+        warmup_steps=cfg.train.denoiser.warmup_steps,
+        max_grad_norm=cfg.train.denoiser.max_grad_norm,
     )
     reward_end_optimizer = ModelOptimizer(
-        model=agent.reward_end_model,
+        model=agent.reward_end,
         lr=cfg.train.reward_end.lr,
         weight_decay=cfg.train.reward_end.weight_decay,
         warmup_steps=cfg.train.reward_end.warmup_steps,
         max_grad_norm=cfg.train.reward_end.max_grad_norm,
     )
     actor_critic_optimizer = ModelOptimizer(
-        model=agent.actor_critic_model,
+        model=agent.actor_critic,
         lr=cfg.train.actor_critic.lr,
         weight_decay=cfg.train.actor_critic.weight_decay,
         warmup_steps=cfg.train.actor_critic.warmup_steps,

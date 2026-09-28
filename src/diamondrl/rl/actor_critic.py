@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from diamondrl.models.common import ResBlockSingleBasic, init_lstm
+from diamondrl.modules.blocks import ResBlockSingleBasic, init_lstm
 
 
 class ActorCriticModel(nn.Module):
@@ -15,7 +15,7 @@ class ActorCriticModel(nn.Module):
         inp_proj_ch: int,
         channels: tuple[int, ...],
         downsample_after: tuple[bool, ...],
-        lstm_hidden: int,
+        lstm_dim: int,
         num_actions: int,
         group_size: int,
     ):
@@ -44,10 +44,10 @@ class ActorCriticModel(nn.Module):
 
         final_flat = channels[-1] * final_h * final_w
 
-        self.lstm_cell = nn.LSTMCell(final_flat, lstm_hidden)
+        self.lstm_cell = nn.LSTMCell(final_flat, lstm_dim)
 
-        self.policy_head = nn.Linear(lstm_hidden, num_actions)
-        self.value_head = nn.Linear(lstm_hidden, 1)
+        self.policy_head = nn.Linear(lstm_dim, num_actions)
+        self.value_head = nn.Linear(lstm_dim, 1)
 
         # Init
         init_lstm(self.lstm_cell)
@@ -72,7 +72,7 @@ class ActorCriticModel(nn.Module):
 
         h_out, c_out = self.lstm_cell(enc.flatten(start_dim=1), lstm_state)
 
-        policies = self.policy_head(h_out)
+        policy_logits = self.policy_head(h_out)
         values = self.value_head(h_out)
 
-        return policies, values.squeeze(1), (h_out, c_out)
+        return policy_logits, values.squeeze(1), (h_out, c_out)

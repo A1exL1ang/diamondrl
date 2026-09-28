@@ -7,7 +7,7 @@ from torch.distributions import Categorical
 from diamondrl.data.episode import EpisodeBuilder
 from diamondrl.data.replay_buffer import ReplayBuffer
 from diamondrl.env.base import AbstractEnv
-from diamondrl.models.actor_critic_model import ActorCriticModel
+from diamondrl.rl.actor_critic import ActorCriticModel
 
 
 class Collector:
@@ -30,11 +30,11 @@ class Collector:
 
         # State
         self.obs, _ = self.env.reset(seed)  # Seeded here
-        self.lstm_hidden = None
+        self.lstm_state = None
         self.episode_builder = EpisodeBuilder(self.obs)
 
         # Tracking
-        self.total_steps = 0
+        self.env_steps = 0
         self.game_count = 0  # Episode is a life, game is an actual game
         self.episode_count = 0  # Finished only
         self.reward_pos, self.reward_neg = 0, 0
@@ -43,15 +43,15 @@ class Collector:
         self.game_reward_sum = defaultdict(float)
         self.game_entropy_sum = defaultdict(float)
 
-    def collect(self, num_steps: int) -> None:
+    def collect(self, num_env_steps: int) -> None:
         device = next(self.actor_critic.parameters()).device
         num_actions = self.env.all_actions.shape[0]
 
-        for _ in range(num_steps):
+        for _ in range(num_env_steps):
             # Action
             with torch.no_grad():
-                policy_logits, _, self.lstm_hidden = self.actor_critic(
-                    self.obs.unsqueeze(0).to(device), self.lstm_hidden
+                policy_logits, _, self.lstm_state = self.actor_critic(
+                    self.obs.unsqueeze(0).to(device), self.lstm_state
                 )
             policy_logits = policy_logits.squeeze(0)
 
@@ -70,7 +70,7 @@ class Collector:
             )
 
             # Update telemetry
-            self.total_steps += 1
+            self.env_steps += 1
             self.game_length[self.game_count] += 1
 
             self.reward_pos += reward > 0
@@ -97,7 +97,7 @@ class Collector:
 
                 # Reset (make sure to not seed here so it carries from previous seed)
                 self.obs, _ = self.env.reset(None)
-                self.lstm_hidden = None
+                self.lstm_state = None
                 self.episode_builder = EpisodeBuilder(self.obs)
 
         # Update in-progress episode

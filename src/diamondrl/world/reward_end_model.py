@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from diamondrl.models.common import ResBlockCond, init_lstm
+from diamondrl.modules.blocks import ResBlockCond, init_lstm
 
 
 class RewardEndModel(nn.Module):
@@ -11,7 +11,7 @@ class RewardEndModel(nn.Module):
         inp_proj_ch: int,
         channels: tuple[int, ...],
         downsample_after: tuple[bool, ...],
-        lstm_hidden: int,
+        lstm_dim: int,
         group_size: int,
         num_actions: int,
         cond_dim: int,
@@ -39,10 +39,10 @@ class RewardEndModel(nn.Module):
                 final_w //= 2
 
         final_flat = channels[-1] * final_h * final_w
-        self.lstm = nn.LSTM(final_flat, lstm_hidden, batch_first=True)
+        self.lstm = nn.LSTM(final_flat, lstm_dim, batch_first=True)
 
         self.head = nn.Sequential(
-            nn.Linear(lstm_hidden, lstm_hidden), nn.SiLU(), nn.Linear(lstm_hidden, 5)
+            nn.Linear(lstm_dim, lstm_dim), nn.SiLU(), nn.Linear(lstm_dim, 5)
         )
 
         # Init, no benefit in init head
@@ -50,24 +50,24 @@ class RewardEndModel(nn.Module):
 
     def forward(
         self,
-        obs_ctx_stk: torch.Tensor,
+        obs_ctx_stack: torch.Tensor,
         action_seq: torch.Tensor,
-        next_obs_stk: torch.Tensor,
+        next_obs_stack: torch.Tensor,
         lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
     ) -> tuple[torch.Tensor, torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         """
-        obs_ctx_stk: (B, T, C, H, W)
+        obs_ctx_stack: (B, T, C, H, W)
         action_seq: (B, T)
-        next_obs_seq: (B, T, C, H, W)
+        next_obs_stack: (B, T, C, H, W)
         lstm_state: ((1, B, dim), (1, B, dim)) where the 1 denotes the layer
                     Note: batch first only applies to input/output and not hidden
         """
-        batch, seq = obs_ctx_stk.shape[:2]
-        obs_ctx_stk = obs_ctx_stk.flatten(start_dim=0, end_dim=1)
+        batch, seq = obs_ctx_stack.shape[:2]
+        obs_ctx_stack = obs_ctx_stack.flatten(start_dim=0, end_dim=1)
         action_seq = action_seq.flatten(start_dim=0, end_dim=1)
-        next_obs_stk = next_obs_stk.flatten(start_dim=0, end_dim=1)
+        next_obs_stack = next_obs_stack.flatten(start_dim=0, end_dim=1)
 
-        enc = torch.cat([obs_ctx_stk, next_obs_stk], dim=1)
+        enc = torch.cat([obs_ctx_stack, next_obs_stack], dim=1)
         cond_emb = self.action_emb(action_seq)
 
         enc = self.inp_proj(enc)
@@ -80,9 +80,9 @@ class RewardEndModel(nn.Module):
 
         # enc is now (B * T, C, H, W) and we need to turn it into (B, T, dim)
         enc = enc.reshape(batch, seq, -1)
-        out, next_hidden = self.lstm(enc, lstm_state)
+        out, next_lstm_state = self.lstm(enc, lstm_state)
 
         result = self.head(out)
 
         # (B, T, logit_dim)
-        return result[..., :3], result[..., 3:], next_hidden
+        return result[..., :3], result[..., 3:], next_lstm_state

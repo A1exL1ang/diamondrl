@@ -6,12 +6,13 @@ import torch
 
 from diamondrl.config.core import Config
 from diamondrl.data.replay_buffer import ReplayBuffer
-from diamondrl.edm.edm_loss import edm_loss
 from diamondrl.env.base import AbstractEnv
-from diamondrl.rl.rl_loss import rl_loss
+from diamondrl.rl.actor_critic_loss import actor_critic_loss
 from diamondrl.rl.rollout import rollout
-from diamondrl.training.build import Agent, Optimizers, build_agent, build_optimizers
+from diamondrl.training.build import Agent, build_agent, build_optimizers
 from diamondrl.training.collector import Collector
+from diamondrl.training.optim import Optimizers
+from diamondrl.world.denoiser_loss import denoiser_loss
 from diamondrl.world.reward_end_loss import reward_end_loss
 
 
@@ -44,8 +45,8 @@ def init_state(cfg: Config, env: AbstractEnv) -> TrainState:
     # Handle device here
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     agent.denoiser.to(device)
-    agent.reward_end_model.to(device)
-    agent.actor_critic_model.to(device)
+    agent.reward_end.to(device)
+    agent.actor_critic.to(device)
 
     # Other stuff
     optimizers = build_optimizers(cfg, agent)
@@ -53,7 +54,7 @@ def init_state(cfg: Config, env: AbstractEnv) -> TrainState:
     collector = Collector(
         env,
         replay_buffer,
-        agent.actor_critic_model,
+        agent.actor_critic,
         cfg.train.collection.eps,
         cfg.seed,
     )
@@ -76,7 +77,7 @@ def initial_collect(cfg: Config, state: TrainState) -> None:
     while (
         state.collector.reward_pos + state.collector.reward_neg
         < collection_cfg.init_min_reward_steps
-        and state.collector.total_steps + collection_cfg.env_steps_per_epoch
+        and state.collector.env_steps + collection_cfg.env_steps_per_epoch
         <= collection_cfg.init_max_env_steps
     ):
         state.collector.collect(collection_cfg.env_steps_per_epoch)
@@ -93,50 +94,49 @@ def train(cfg: Config, state: TrainState) -> None:
             initial_collect(cfg, state)
         else:
             if (
-                state.collector.total_steps + cfg.train.collection.env_steps_per_epoch
+                state.collector.env_steps + cfg.train.collection.env_steps_per_epoch
                 > cfg.train.collection.total_env_steps
             ):
                 break
             state.collector.collect(cfg.train.collection.env_steps_per_epoch)
 
-        # Diffusion model
-        diffusion_cfg = cfg.train.diffusion
-        for step in range(
-            diffusion_cfg.steps_init if is_first else diffusion_cfg.steps_per_epoch
+        # Denoiser
+        denoiser_cfg = cfg.train.denoiser
+        for _ in range(
+            denoiser_cfg.steps_init if is_first else denoiser_cfg.steps_per_epoch
         ):
             context_batch = state.replay_buffer.sample_context(
-                batch_size=diffusion_cfg.batch_size,
+                batch_size=denoiser_cfg.batch_size,
                 ctx_frames=cfg.world.ctx_frames,
-                future_frames=diffusion_cfg.future_frames,
+                future_frames=denoiser_cfg.future_frames,
             ).to(device)
-            loss_diffusion, loss_list_diffusion = edm_loss(
+            loss_denoiser, info_denoiser = denoiser_loss(
                 denoiser=state.agent.denoiser,
                 context_batch=context_batch,
-                sigma_min_train=diffusion_cfg.sigma_min,
-                sigma_max_train=diffusion_cfg.sigma_max,
-                p_mean=diffusion_cfg.p_mean,
-                p_std=diffusion_cfg.p_std,
+                sigma_min=denoiser_cfg.sigma_min,
+                sigma_max=denoiser_cfg.sigma_max,
+                p_mean=denoiser_cfg.p_mean,
+                p_std=denoiser_cfg.p_std,
             )
-            state.optimizers.denoiser.update(loss_diffusion)
+            state.optimizers.denoiser.update(loss_denoiser)
 
-        # Reward model
+        # Reward end
         reward_end_cfg = cfg.train.reward_end
-        for step in range(
+        for _ in range(
             reward_end_cfg.steps_init if is_first else reward_end_cfg.steps_per_epoch
         ):
             seq_batch = state.replay_buffer.sample_masked_sequence(
                 batch_size=reward_end_cfg.batch_size,
-                seq_transition_count=cfg.world.ctx_frames + cfg.world.horizon,
+                num_transitions=cfg.world.ctx_frames + cfg.world.horizon,
             ).to(device)
-            loss_reward_end, loss_reward_end_info = reward_end_loss(
-                state.agent.reward_end_model, seq_batch
+            loss_reward_end, info_reward_end = reward_end_loss(
+                state.agent.reward_end, seq_batch
             )
             state.optimizers.reward_end.update(loss_reward_end)
 
-        # RL
-        # TODO: consistent naming of loss_<name>
+        # Actor critic
         actor_critic_cfg = cfg.train.actor_critic
-        for step in range(
+        for _ in range(
             actor_critic_cfg.steps_init
             if is_first
             else actor_critic_cfg.steps_per_epoch
@@ -147,23 +147,23 @@ def train(cfg: Config, state: TrainState) -> None:
                 future_frames=0,
             ).to(device)
 
-            trajectories = rollout(
-                actor_critic_model=state.agent.actor_critic_model,
-                reward_end_model=state.agent.reward_end_model,
+            traj = rollout(
+                actor_critic=state.agent.actor_critic,
+                reward_end=state.agent.reward_end,
                 next_obs_model=state.agent.next_obs_model,
-                obs_ctx_stk_init=context_batch.obs_stack,
+                obs_ctx_stack_init=context_batch.obs_stack,
                 action_seq_init=context_batch.actions,
-                num_rollout_actions=cfg.world.horizon,
+                horizon=cfg.world.horizon,
             ).to(device)
 
-            loss_rl, loss_rl_info = rl_loss(
-                traj=trajectories,
+            loss_actor_critic, info_actor_critic = actor_critic_loss(
+                traj=traj,
                 weight_value=cfg.train.rl.weight_value,
                 weight_entropy=cfg.train.rl.weight_entropy,
                 lamb=cfg.train.rl.lamb,
                 gamma=cfg.train.rl.gamma,
             )
-            state.optimizers.actor_critic.update(loss_rl)
+            state.optimizers.actor_critic.update(loss_actor_critic)
 
         # Telemetry
         state.epoch += 1

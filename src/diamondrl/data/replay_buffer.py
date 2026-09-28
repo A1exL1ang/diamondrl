@@ -56,7 +56,7 @@ class ReplayBuffer:
         return ContextBatch.cat(indiv_samples)
 
     def sample_masked_sequence(
-        self, batch_size: int, seq_transition_count: int
+        self, batch_size: int, num_transitions: int
     ) -> MaskedSequenceBatch:
         eligible = [i for i, ep in self.episodes.items() if len(ep.actions) >= 1]
 
@@ -69,9 +69,7 @@ class ReplayBuffer:
         counts = Counter(sampled_indices.tolist())
 
         indiv_samples = [
-            self.episodes[eligible[idx]].sample_masked_sequence(
-                count, seq_transition_count
-            )
+            self.episodes[eligible[idx]].sample_masked_sequence(count, num_transitions)
             for idx, count in counts.items()
         ]
 

@@ -1,7 +1,7 @@
 import torch
 
-from diamondrl.edm.denoiser import Denoiser
-from diamondrl.edm.sampling import sampler
+from diamondrl.world.denoiser import Denoiser
+from diamondrl.world.sampler import sampler
 
 
 class NextObsModel:
@@ -10,23 +10,23 @@ class NextObsModel:
         denoiser: Denoiser,
         obs_shape: tuple[int, int, int],
         rho: float,
-        sigma_max_ode: float,
         sigma_min_ode: float,
-        steps: int,
+        sigma_max_ode: float,
+        denoising_steps: int,
     ):
-        # TODO: swap sigma max min
         self.denoiser = denoiser
         self.obs_shape = obs_shape
         self.rho = rho
-        self.sigma_max_ode = sigma_max_ode
         self.sigma_min_ode = sigma_min_ode
-        self.steps = steps
+        self.sigma_max_ode = sigma_max_ode
+        self.denoising_steps = denoising_steps
 
     def next_obs_sample(
         self, obs_ctx_stack: torch.Tensor, actions: torch.Tensor
     ) -> torch.Tensor:
         """
-        obs_ctx_buff: (B, T, C, H, W)
+        obs_ctx_stack: (B, T, C, H, W)
+        actions: (B, T)
         """
         obs_ctx_cat = obs_ctx_stack.flatten(1, 2)
 
@@ -36,7 +36,7 @@ class NextObsModel:
             actions,
             self.obs_shape,
             self.rho,
-            self.sigma_max_ode,
             self.sigma_min_ode,
-            self.steps,
+            self.sigma_max_ode,
+            self.denoising_steps,
         ).clamp(min=-1.0, max=+1.0)

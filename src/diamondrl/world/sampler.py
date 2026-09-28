@@ -1,7 +1,6 @@
 import torch
-from torch._tensor import Tensor
 
-from diamondrl.edm.denoiser import Denoiser
+from diamondrl.world.denoiser import Denoiser
 
 
 def sampler(
@@ -10,20 +9,20 @@ def sampler(
     actions: torch.Tensor,
     obs_shape: tuple[int, int, int],
     rho: float,
-    sigma_max_ode: float,
     sigma_min_ode: float,
-    steps: int,
+    sigma_max_ode: float,
+    denoising_steps: int,
 ) -> torch.Tensor:
-    # TODO: swap sigma max min
-
     """
+    EDM rho-schedule (Karras et al. 2022, eq. 5) with Euler steps.
+
     obs_shape is for a single obs
     """
-    if steps <= 0:
-        raise ValueError(f"steps {steps} should be > 0")
+    if denoising_steps <= 0:
+        raise ValueError(f"denoising_steps {denoising_steps} should be > 0")
 
     device = next(denoiser.parameters()).device
-    x: Tensor = torch.normal(
+    x: torch.Tensor = torch.normal(
         mean=0.0,
         std=sigma_max_ode,
         size=(obs_ctx_cat.shape[0], *obs_shape),
@@ -35,18 +34,18 @@ def sampler(
             (
                 sigma_max_ode ** (1 / rho)
                 + i
-                / (steps - 1)
+                / (denoising_steps - 1)
                 * (sigma_min_ode ** (1 / rho) - sigma_max_ode ** (1 / rho))
             )
             ** rho
-            for i in range(steps)
+            for i in range(denoising_steps)
         ]
-        if steps > 1
+        if denoising_steps > 1
         else [sigma_max_ode]
     )
     sigmas = torch.tensor(sigmas + [0.0], device=device)
 
-    for i in range(steps):
+    for i in range(denoising_steps):
         t = sigmas[i]
         delta_t = sigmas[i + 1] - sigmas[i]
 

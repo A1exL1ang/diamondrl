@@ -5,7 +5,7 @@ from diamondrl.config.train import TrainConfig
 
 
 @dataclass
-class DiffusionConfig:
+class DenoiserConfig:
     inp_proj_ch: int
     midcoder_ch: int
     enc_dec_channels: tuple[int, ...]
@@ -18,8 +18,8 @@ class DiffusionConfig:
     sigma_data: float
     sigma_off: float
 
-    sigma_max_ode: float
     sigma_min_ode: float
+    sigma_max_ode: float
 
     denoising_steps: int
 
@@ -29,7 +29,7 @@ class RewardEndConfig:
     inp_proj_ch: int
     channels: tuple[int, ...]
     downsample_after: tuple[bool, ...]
-    lstm_hidden: int
+    lstm_dim: int
     group_size: int
     cond_dim: int
 
@@ -39,7 +39,7 @@ class ActorCriticConfig:
     inp_proj_ch: int
     channels: tuple[int, ...]
     downsample_after: tuple[bool, ...]
-    lstm_hidden: int
+    lstm_dim: int
     group_size: int
 
 
@@ -54,7 +54,7 @@ class Config:
     seed: int
 
     env: EnvConfig
-    diffusion: DiffusionConfig
+    denoiser: DenoiserConfig
     reward_end: RewardEndConfig
     actor_critic: ActorCriticConfig
     world: WorldConfig

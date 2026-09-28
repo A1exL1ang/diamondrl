@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from diamondrl.models.common import ResBlockCond
+from diamondrl.modules.blocks import ResBlockCond
 
 
 class DownBlock(nn.Module):

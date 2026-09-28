@@ -29,7 +29,7 @@ def lambda_returns(
     return lamb_ret
 
 
-def rl_loss(
+def actor_critic_loss(
     traj: Trajectory,
     weight_value: float,
     weight_entropy: float,
@@ -37,7 +37,7 @@ def rl_loss(
     gamma: float,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
 
-    lamb_ret = lambda_returns(traj.obs_values, traj.rewards, traj.ends, lamb, gamma)
+    lamb_ret = lambda_returns(traj.values, traj.rewards, traj.ends, lamb, gamma)
 
     num_valid = traj.valid.sum().clamp_min(1.0)
     valid_mask = traj.valid.float()
@@ -51,11 +51,11 @@ def rl_loss(
     ).squeeze(2)
 
     # Losses
-    advantage_detach = (lamb_ret - traj.obs_values[:, :-1]).detach()
+    advantage_detach = (lamb_ret - traj.values[:, :-1]).detach()
     loss_policy = -((log_probs * advantage_detach * valid_mask).sum() / num_valid)
 
     loss_value = weight_value * (
-        (((traj.obs_values[:, :-1] - lamb_ret) ** 2) * valid_mask).sum() / num_valid
+        (((traj.values[:, :-1] - lamb_ret) ** 2) * valid_mask).sum() / num_valid
     )
 
     average_entropy = (
@@ -63,9 +63,9 @@ def rl_loss(
     ).sum() / num_valid
     loss_entropy = -weight_entropy * average_entropy
 
-    loss_total = loss_policy + loss_value + loss_entropy
+    loss = loss_policy + loss_value + loss_entropy
 
-    return loss_total, {
+    return loss, {
         "loss_policy": loss_policy.detach(),
         "loss_value": loss_value.detach(),
         "loss_entropy": loss_entropy.detach(),

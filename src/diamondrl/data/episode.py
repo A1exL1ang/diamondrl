@@ -2,20 +2,21 @@ from dataclasses import dataclass
 
 import torch
 
-# TODO: name it future_frames
-
 
 @dataclass
 class ContextBatch:
     """
-    TODO: fix this docstring
+    ctx context frames followed by future frames.
 
+    The last context frame and every future frame are real; only the first
+    ctx - 1 frames may be left padding (zero frames with action 0).
+    actions[:, t] is the action taken at obs_stack[:, t].
     """
 
-    obs_stack: torch.Tensor  # (B, ctx + roll, C, H, W)
-    actions: torch.Tensor  # (B, ctx + roll - 1)
-    rewards: torch.Tensor  # (B, ctx + roll - 1)
-    terminations: torch.Tensor  # (B, ctx + roll - 1)
+    obs_stack: torch.Tensor  # (B, ctx + future_frames, C, H, W)
+    actions: torch.Tensor  # (B, ctx + future_frames - 1)
+    rewards: torch.Tensor  # (B, ctx + future_frames - 1)
+    terminations: torch.Tensor  # (B, ctx + future_frames - 1)
 
     ctx: int
 
@@ -132,21 +133,20 @@ class Episode:
         self, batch_size: int, ctx_frames: int, future_frames: int
     ) -> ContextBatch:
         """
-        think of roll_len as the number of actions u roll folwards
-        ctx is the number of FRAMES and roll is number of actions past that one
-
+        ctx_frames context frames followed by future_frames frames that must be real.
+        With future_frames=0 the last context frame is never the episode's final frame.
         """
         if ctx_frames < 1:
-            raise ValueError(f"ctx_len {ctx_frames} must be >= 1")
+            raise ValueError(f"ctx_frames {ctx_frames} must be >= 1")
         if future_frames < 0:
-            raise ValueError(f"roll_len {future_frames} must be >= 0")
+            raise ValueError(f"future_frames {future_frames} must be >= 0")
         if len(self.actions) < max(future_frames, 1):
             raise ValueError(
                 f"have {len(self.actions)} transitions but need max({future_frames}, 1)"
             )
 
-        # Note that randint is exclusive and in the case roll_actions=0 we don't want to
-        # sample the terminal state
+        # Note that randint is exclusive and in the case future_frames=0 we don't want
+        # to sample the terminal state
         anchors = torch.randint(
             0,
             min(len(self.actions) - future_frames + 1, len(self.actions)),
@@ -169,18 +169,18 @@ class Episode:
         )
 
     def sample_masked_sequence(
-        self, batch_size: int, seq_transition_count: int
+        self, batch_size: int, num_transitions: int
     ) -> MaskedSequenceBatch:
-        if seq_transition_count < 1:
-            raise ValueError(f"seq_len {seq_transition_count} must be >= 1")
+        if num_transitions < 1:
+            raise ValueError(f"num_transitions {num_transitions} must be >= 1")
         if len(self.actions) < 1:
             raise ValueError("must have at least one trans")
 
         # Sample a random transition and then the index of the transition
         starts = torch.randint(0, len(self.actions), (batch_size,)) - torch.randint(
-            0, seq_transition_count, (batch_size,)
+            0, num_transitions, (batch_size,)
         )
-        offsets = torch.arange(0, seq_transition_count + 1)
+        offsets = torch.arange(0, num_transitions + 1)
         indices = starts[:, None] + offsets[None, :]
 
         data = self.gather(indices)
