@@ -43,7 +43,7 @@ class Collector:
         self.game_reward_sum = defaultdict(float)
         self.game_entropy_sum = defaultdict(float)
 
-    def collect(self, num_env_steps: int) -> None:
+    def collect(self, num_env_steps: int, epoch: int) -> None:
         device = next(self.actor_critic.parameters()).device
         num_actions = self.env.all_actions.shape[0]
 
@@ -67,6 +67,7 @@ class Collector:
                 reward=reward,
                 observation=self.obs,
                 termination=terminated,
+                epoch=epoch,
             )
 
             # Update telemetry

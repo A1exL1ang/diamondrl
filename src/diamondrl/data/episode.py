@@ -88,9 +88,14 @@ class Episode:
         actions: list[int],
         rewards: list[float],
         terminations: list[bool],
+        epochs: list[int],
     ):
         if not (
-            len(actions) == len(rewards) == len(terminations) == len(observations) - 1
+            len(actions)
+            == len(rewards)
+            == len(terminations)
+            == len(epochs)
+            == len(observations) - 1
         ):
             raise ValueError("episode fields have inconsistent lengths")
 
@@ -98,6 +103,7 @@ class Episode:
         self.actions = torch.tensor(actions).long()
         self.rewards = torch.tensor(rewards).float()
         self.terminations = torch.tensor(terminations).bool()
+        self.epochs = torch.tensor(epochs).long()
 
     def gather(self, indices: torch.Tensor) -> dict[str, torch.Tensor]:
         """
@@ -209,14 +215,27 @@ class EpisodeBuilder:
         self.actions: list[int] = []
         self.rewards: list[float] = []
         self.terminations: list[bool] = []
+        self.epochs: list[int] = []
 
     def push_info(
-        self, action: int, reward: float, observation: torch.Tensor, termination: bool
+        self,
+        action: int,
+        reward: float,
+        observation: torch.Tensor,
+        termination: bool,
+        epoch: int,
     ) -> None:
         self.observations.append(observation.detach().cpu().clone())
         self.actions.append(action)
         self.rewards.append(reward)
         self.terminations.append(termination)
+        self.epochs.append(epoch)
 
     def snapshot(self) -> Episode:
-        return Episode(self.observations, self.actions, self.rewards, self.terminations)
+        return Episode(
+            self.observations,
+            self.actions,
+            self.rewards,
+            self.terminations,
+            self.epochs,
+        )

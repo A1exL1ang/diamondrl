@@ -72,7 +72,7 @@ def init_state(cfg: Config, env: AbstractEnv) -> TrainState:
 
 def initial_collect(cfg: Config, state: TrainState) -> None:
     collection_cfg = cfg.train.collection
-    state.collector.collect(collection_cfg.init_min_env_steps)
+    state.collector.collect(collection_cfg.init_min_env_steps, epoch=state.epoch)
 
     # Keep collecting until we either reach our threshold or
     while (
@@ -81,7 +81,7 @@ def initial_collect(cfg: Config, state: TrainState) -> None:
         and state.collector.env_steps + collection_cfg.env_steps_per_epoch
         <= collection_cfg.init_max_env_steps
     ):
-        state.collector.collect(collection_cfg.env_steps_per_epoch)
+        state.collector.collect(collection_cfg.env_steps_per_epoch, epoch=state.epoch)
 
 
 def train(cfg: Config, state: TrainState) -> None:
@@ -97,7 +97,9 @@ def train(cfg: Config, state: TrainState) -> None:
             state.collector.env_steps + cfg.train.collection.env_steps_per_epoch
             <= cfg.train.collection.total_env_steps
         ):
-            state.collector.collect(cfg.train.collection.env_steps_per_epoch)
+            state.collector.collect(
+                cfg.train.collection.env_steps_per_epoch, epoch=state.epoch
+            )
         elif state.epochs_after_collection < cfg.train.epochs_after_collection:
             state.epochs_after_collection += 1
         else:
