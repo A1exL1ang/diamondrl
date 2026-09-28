@@ -11,6 +11,7 @@ from diamondrl.rl.actor_critic_loss import actor_critic_loss
 from diamondrl.rl.rollout import rollout
 from diamondrl.training.build import Agent, build_agent, build_optimizers
 from diamondrl.training.collector import Collector
+from diamondrl.training.eval import Evaluator
 from diamondrl.training.optim import Optimizers
 from diamondrl.world.denoiser_loss import denoiser_loss
 from diamondrl.world.reward_end_loss import reward_end_loss
@@ -22,12 +23,13 @@ class TrainState:
     optimizers: Optimizers
     replay_buffer: ReplayBuffer
     collector: Collector
+    evaluator: Evaluator
     epoch: int
     epochs_after_collection: int
 
 
-def derive_seed(base_seed: int, epoch: int) -> int:
-    return base_seed + epoch
+def derive_seed(base_seed: int, epoch: int, is_eval: bool) -> int:
+    return int(np.random.SeedSequence([base_seed, epoch, is_eval]).generate_state(1)[0])
 
 
 def seed_everything(seed: int) -> None:
@@ -36,12 +38,16 @@ def seed_everything(seed: int) -> None:
     torch.manual_seed(seed)
 
 
-def init_state(cfg: Config, env: AbstractEnv) -> TrainState:
+def init_state(
+    cfg: Config, train_env: AbstractEnv, eval_env: AbstractEnv
+) -> TrainState:
     # Seed
-    seed_everything(cfg.seed)
+    derived_seed_train = derive_seed(base_seed=cfg.seed, epoch=0, is_eval=False)
+    derived_seed_eval = derive_seed(base_seed=cfg.seed, epoch=0, is_eval=True)
+    seed_everything(derived_seed_train)
 
     # Agent
-    agent = build_agent(cfg, env)
+    agent = build_agent(cfg, train_env)
 
     # Handle device here
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -52,12 +58,23 @@ def init_state(cfg: Config, env: AbstractEnv) -> TrainState:
     # Other stuff
     optimizers = build_optimizers(cfg, agent)
     replay_buffer = ReplayBuffer(cfg.train.sample_weights)
+
+    # Seed for the env is set here
     collector = Collector(
-        env,
-        replay_buffer,
-        agent.actor_critic,
-        cfg.train.collection.eps,
-        cfg.seed,
+        env=train_env,
+        replay_buffer=replay_buffer,
+        actor_critic=agent.actor_critic,
+        eps=cfg.train.collection.eps,
+        seed=derived_seed_train,
+    )
+
+    # Seed for the evaluator env is also sethere
+    evaluator = Evaluator(
+        env=eval_env,
+        actor_critic=agent.actor_critic,
+        eps=cfg.train.eval.eps,
+        max_steps_per_game=cfg.train.eval.max_steps_per_game,
+        seed=derived_seed_eval,
     )
 
     return TrainState(
@@ -65,6 +82,7 @@ def init_state(cfg: Config, env: AbstractEnv) -> TrainState:
         optimizers=optimizers,
         replay_buffer=replay_buffer,
         collector=collector,
+        evaluator=evaluator,
         epoch=0,
         epochs_after_collection=0,
     )
@@ -170,5 +188,7 @@ def train(cfg: Config, state: TrainState) -> None:
             )
             state.optimizers.actor_critic.update(loss_actor_critic)
 
-        # Telemetry
+        # Telemetry and eval
         state.epoch += 1
+
+    # Final eval

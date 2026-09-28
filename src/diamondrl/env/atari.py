@@ -30,7 +30,8 @@ class AtariEnv(AbstractEnv):
         # Note that we use this frameskip to avoid sprite flicker
         self.env = MaxAndSkipEnv(self.env, cfg.frameskip)
 
-        self.env = EpisodicLifeEnv(self.env)
+        if self.cfg.episodic_life:
+            self.env = EpisodicLifeEnv(self.env)
 
     @property
     def all_actions(self) -> torch.Tensor:
@@ -60,7 +61,12 @@ class AtariEnv(AbstractEnv):
         self, action: int
     ) -> tuple[torch.Tensor, float, bool, bool, dict[str, Any]]:
         obs, reward, terminated, truncated, info = self.env.step(action)
-        info["game_end"] = self.env.was_real_done  # type: ignore
+
+        info["game_end"] = (
+            self.env.was_real_done  # type: ignore
+            if self.cfg.episodic_life
+            else (terminated or truncated)
+        )
         return self._proc_obs(obs), float(reward), terminated, truncated, info
 
     def reset(self, seed: int | None) -> tuple[torch.Tensor, dict[str, Any]]:

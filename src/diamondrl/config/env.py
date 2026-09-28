@@ -13,6 +13,7 @@ class EnvConfig:
 @dataclass
 class AtariEnvConfig(EnvConfig):
     rescaled_shape: tuple[int, int, int]
+    episodic_life: bool
     game: str
     max_noop: int
     frameskip: int

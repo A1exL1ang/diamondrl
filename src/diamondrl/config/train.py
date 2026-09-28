@@ -59,6 +59,15 @@ class RLConfig:
 
 
 @dataclass
+class EvalConfig:
+    every: int
+    num_games: int
+    num_games_final: int
+    max_steps_per_game: int
+    eps: float
+
+
+@dataclass
 class TrainConfig:
     sample_weights: tuple[float, ...]
     epochs_after_collection: int
@@ -68,3 +77,4 @@ class TrainConfig:
     reward_end: RewardEndTrainConfig
     actor_critic: ActorCriticTrainConfig
     rl: RLConfig
+    eval: EvalConfig
