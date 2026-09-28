@@ -23,6 +23,7 @@ class TrainState:
     replay_buffer: ReplayBuffer
     collector: Collector
     epoch: int
+    epochs_after_collection: int
 
 
 def derive_seed(base_seed: int, epoch: int) -> int:
@@ -58,14 +59,14 @@ def init_state(cfg: Config, env: AbstractEnv) -> TrainState:
         cfg.train.collection.eps,
         cfg.seed,
     )
-    epoch = 0
 
     return TrainState(
         agent=agent,
         optimizers=optimizers,
         replay_buffer=replay_buffer,
         collector=collector,
-        epoch=epoch,
+        epoch=0,
+        epochs_after_collection=0,
     )
 
 
@@ -89,16 +90,18 @@ def train(cfg: Config, state: TrainState) -> None:
     while True:
         is_first = state.epoch == 0
 
-        # Collection
+        # Collection (warning: we increment epochs_after_collection here upfront)
         if is_first:
             initial_collect(cfg, state)
-        else:
-            if (
-                state.collector.env_steps + cfg.train.collection.env_steps_per_epoch
-                > cfg.train.collection.total_env_steps
-            ):
-                break
+        elif (
+            state.collector.env_steps + cfg.train.collection.env_steps_per_epoch
+            <= cfg.train.collection.total_env_steps
+        ):
             state.collector.collect(cfg.train.collection.env_steps_per_epoch)
+        elif state.epochs_after_collection < cfg.train.epochs_after_collection:
+            state.epochs_after_collection += 1
+        else:
+            break
 
         # Denoiser
         denoiser_cfg = cfg.train.denoiser
@@ -167,5 +170,3 @@ def train(cfg: Config, state: TrainState) -> None:
 
         # Telemetry
         state.epoch += 1
-
-    # TODO: final pass
