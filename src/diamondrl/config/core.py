@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from diamondrl.config.env import EnvConfig
+from diamondrl.config.train import TrainConfig
 
 
 @dataclass
@@ -8,7 +9,6 @@ class DiffusionConfig:
     inp_proj_ch: int
     midcoder_ch: int
     enc_dec_channels: tuple[int, ...]
-    out_ch: int
 
     group_size: int
     cond_dim: int
@@ -17,9 +17,6 @@ class DiffusionConfig:
 
     sigma_data: float
     sigma_off: float
-
-    sigma_min_train: float
-    sigma_max_train: float
 
     sigma_max_ode: float
     sigma_min_ode: float
@@ -53,28 +50,12 @@ class WorldConfig:
 
 
 @dataclass
-class TrainConfig:
-    # Buffer
-    sample_weights: tuple[float, ...]
-
-    # RL
-    num_edm_train_rollout: int
-    weight_value: float
-    weight_entropy: float
-    lamb: float
-    gamma: float
-
-
-@dataclass
 class Config:
     seed: int
 
     env: EnvConfig
     diffusion: DiffusionConfig
-
-    rew_end: RewardEndConfig
-    act_crit: ActorCriticConfig
-
+    reward_end: RewardEndConfig
+    actor_critic: ActorCriticConfig
     world: WorldConfig
-
     train: TrainConfig

@@ -24,6 +24,17 @@ class Trajectory:
     policy_logits: torch.Tensor
     obs_values: torch.Tensor
 
+    def to(self, device: torch.device | str) -> "Trajectory":
+        return Trajectory(
+            obs=self.obs.to(device),
+            actions=self.actions.to(device),
+            rewards=self.rewards.to(device),
+            ends=self.ends.to(device),
+            valid=self.valid.to(device),
+            policy_logits=self.policy_logits.to(device),
+            obs_values=self.obs_values.to(device),
+        )
+
 
 def rollout(
     actor_critic_model: ActorCriticModel,

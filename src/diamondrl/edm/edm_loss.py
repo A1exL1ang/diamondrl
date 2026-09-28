@@ -1,5 +1,6 @@
 import torch
 
+from diamondrl.data.episode import ContextBatch
 from diamondrl.edm.denoiser import Denoiser
 
 
@@ -53,29 +54,28 @@ def edm_loss_single(
 
 def edm_loss(
     denoiser: Denoiser,
-    obs_ctx_stk_all_ref: torch.Tensor,
-    actions: torch.Tensor,
-    extra_unroll_steps: int,
+    context_batch: ContextBatch,
     sigma_min_train: float,
     sigma_max_train: float,
     p_mean: float,
     p_std: float,
 ) -> tuple[torch.Tensor, list[float]]:
     """
-    obs_ctx_stk_all_ref: (B, ctx + 1 + extra_unroll_steps, C, H, W)
+    cur_frames_stk: (B, ctx + future_frames, C, H, W)
     actions: (B, ctx + extra_unroll_steps)
     """
-    cur_frames_stk = obs_ctx_stk_all_ref.clone()
-    ctx = obs_ctx_stk_all_ref.shape[1] - 1 - extra_unroll_steps
+    cur_frames_stk = context_batch.obs_stack.clone()
+    ctx = context_batch.ctx
+    future_frames = context_batch.obs_stack.shape[1] - ctx
 
     losses: list[torch.Tensor] = []
 
     # First step doesn't unroll
-    for step in range(extra_unroll_steps + 1):
+    for step in range(future_frames):
         loss, denoiser_out = edm_loss_single(
             denoiser=denoiser,
             obs_ctx_stk_with_next=cur_frames_stk[:, step : step + ctx + 1, ...],
-            actions=actions[:, step : step + ctx],
+            actions=context_batch.actions[:, step : step + ctx],
             sigma_min_train=sigma_min_train,
             sigma_max_train=sigma_max_train,
             p_mean=p_mean,

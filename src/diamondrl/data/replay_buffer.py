@@ -2,7 +2,7 @@ from collections import Counter
 
 import torch
 
-from diamondrl.data.episode import Episode, MaskedSequenceBatch, RolloutBatch
+from diamondrl.data.episode import ContextBatch, Episode, MaskedSequenceBatch
 
 
 class ReplayBuffer:
@@ -27,15 +27,15 @@ class ReplayBuffer:
         # May not sum to 1 if n is too small
         return probs / probs.sum()
 
-    def sample_rollout(
-        self, batch_size: int, ctx_frames: int, roll_actions: int
-    ) -> RolloutBatch:
+    def sample_context(
+        self, batch_size: int, ctx_frames: int, future_frames: int
+    ) -> ContextBatch:
 
         # Note: dict is chronological
         eligible = [
             i
             for i, ep in self.episodes.items()
-            if len(ep.actions) >= max(roll_actions, 1)
+            if len(ep.actions) >= max(future_frames, 1)
         ]
 
         if not eligible:
@@ -47,13 +47,15 @@ class ReplayBuffer:
         counts = Counter(sampled_indices.tolist())
 
         indiv_samples = [
-            self.episodes[eligible[idx]].sample_rollout(count, ctx_frames, roll_actions)
+            self.episodes[eligible[idx]].sample_context(
+                count, ctx_frames, future_frames
+            )
             for idx, count in counts.items()
         ]
 
-        return RolloutBatch.cat(indiv_samples)
+        return ContextBatch.cat(indiv_samples)
 
-    def sample_sequence(
+    def sample_masked_sequence(
         self, batch_size: int, seq_transition_count: int
     ) -> MaskedSequenceBatch:
         eligible = [i for i, ep in self.episodes.items() if len(ep.actions) >= 1]
@@ -67,7 +69,9 @@ class ReplayBuffer:
         counts = Counter(sampled_indices.tolist())
 
         indiv_samples = [
-            self.episodes[eligible[idx]].sample_sequence(count, seq_transition_count)
+            self.episodes[eligible[idx]].sample_masked_sequence(
+                count, seq_transition_count
+            )
             for idx, count in counts.items()
         ]
 

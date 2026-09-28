@@ -2,24 +2,14 @@ from dataclasses import dataclass
 
 import torch
 
+# TODO: name it future_frames
+
 
 @dataclass
-class RolloutBatch:
+class ContextBatch:
     """
     TODO: fix this docstring
 
-    You can think of the first "ctx" things as "context/input" with the
-    most recent state existing and padding for start is permitted. Then
-    the state is rolled out for "roll" steps.
-
-    More specifically, obs[:, :ctx] represent the "context/input"
-    and obs[:, ctx - 1] must be real.
-
-    Transition information is stored for all obs but the last
-    but assume that the ones for padded obs are not relevant.
-
-    This is a slight deviation from DIAMOND where it allows for
-    the "roll" steps to be padding which might be good for short trajectories.
     """
 
     obs_stack: torch.Tensor  # (B, ctx + roll, C, H, W)
@@ -30,7 +20,7 @@ class RolloutBatch:
     ctx: int
 
     @classmethod
-    def cat(cls, batches: list["RolloutBatch"]) -> "RolloutBatch":
+    def cat(cls, batches: list["ContextBatch"]) -> "ContextBatch":
         assert batches, "batches should exist"
         assert all(b.ctx == batches[0].ctx for b in batches), "ctx should be consistent"
 
@@ -40,6 +30,15 @@ class RolloutBatch:
             rewards=torch.cat([b.rewards for b in batches]),
             terminations=torch.cat([b.terminations for b in batches]),
             ctx=batches[0].ctx,
+        )
+
+    def to(self, device: torch.device | str) -> "ContextBatch":
+        return ContextBatch(
+            obs_stack=self.obs_stack.to(device),
+            actions=self.actions.to(device),
+            rewards=self.rewards.to(device),
+            terminations=self.terminations.to(device),
+            ctx=self.ctx,
         )
 
 
@@ -65,6 +64,15 @@ class MaskedSequenceBatch:
             rewards=torch.cat([b.rewards for b in batches]),
             terminations=torch.cat([b.terminations for b in batches]),
             valid=torch.cat([b.valid for b in batches]),
+        )
+
+    def to(self, device: torch.device | str) -> "MaskedSequenceBatch":
+        return MaskedSequenceBatch(
+            obs_stack=self.obs_stack.to(device),
+            actions=self.actions.to(device),
+            rewards=self.rewards.to(device),
+            terminations=self.terminations.to(device),
+            valid=self.valid.to(device),
         )
 
 
@@ -120,9 +128,9 @@ class Episode:
             "valid": good_transition,
         }
 
-    def sample_rollout(
-        self, batch_size: int, ctx_frames: int, roll_actions: int
-    ) -> RolloutBatch:
+    def sample_context(
+        self, batch_size: int, ctx_frames: int, future_frames: int
+    ) -> ContextBatch:
         """
         think of roll_len as the number of actions u roll folwards
         ctx is the number of FRAMES and roll is number of actions past that one
@@ -130,21 +138,21 @@ class Episode:
         """
         if ctx_frames < 1:
             raise ValueError(f"ctx_len {ctx_frames} must be >= 1")
-        if roll_actions < 0:
-            raise ValueError(f"roll_len {roll_actions} must be >= 0")
-        if len(self.actions) < max(roll_actions, 1):
+        if future_frames < 0:
+            raise ValueError(f"roll_len {future_frames} must be >= 0")
+        if len(self.actions) < max(future_frames, 1):
             raise ValueError(
-                f"have {len(self.actions)} transitions but need max({roll_actions}, 1)"
+                f"have {len(self.actions)} transitions but need max({future_frames}, 1)"
             )
 
         # Note that randint is exclusive and in the case roll_actions=0 we don't want to
         # sample the terminal state
         anchors = torch.randint(
             0,
-            min(len(self.actions) - roll_actions + 1, len(self.actions)),
+            min(len(self.actions) - future_frames + 1, len(self.actions)),
             (batch_size,),
         )
-        offsets = torch.arange(-ctx_frames + 1, roll_actions + 1)
+        offsets = torch.arange(-ctx_frames + 1, future_frames + 1)
 
         # (n, 1) + (1, W) --> (n, W) where i-th row are raw indices for i-th window
         # Note that we will chop off final column for actions/rewards/terminations
@@ -152,7 +160,7 @@ class Episode:
 
         data = self.gather(indices)
 
-        return RolloutBatch(
+        return ContextBatch(
             obs_stack=data["obs_stack"],
             actions=data["actions"],
             rewards=data["rewards"],
@@ -160,7 +168,7 @@ class Episode:
             ctx=ctx_frames,
         )
 
-    def sample_sequence(
+    def sample_masked_sequence(
         self, batch_size: int, seq_transition_count: int
     ) -> MaskedSequenceBatch:
         if seq_transition_count < 1:

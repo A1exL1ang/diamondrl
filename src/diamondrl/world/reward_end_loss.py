@@ -6,17 +6,20 @@ from diamondrl.models.reward_end_model import RewardEndModel
 
 
 def reward_end_loss(
-    reward_end_model: RewardEndModel, seq: MaskedSequenceBatch
+    reward_end_model: RewardEndModel, seq_batch: MaskedSequenceBatch
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
-    valid_mask_flat = seq.valid.float().flatten()
+    valid_mask_flat = seq_batch.valid.float().flatten()
     num_valid = valid_mask_flat.sum().clamp_min(1.0)
 
-    reward_target_flat = seq.rewards.flatten().sign().long() + 1
-    end_target_flat = seq.terminations.flatten().long()
+    reward_target_flat = seq_batch.rewards.flatten().sign().long() + 1
+    end_target_flat = seq_batch.terminations.flatten().long()
 
     # Forward
     reward_logits, end_logits, _ = reward_end_model(
-        seq.obs_stack[:, :-1, ...], seq.actions, seq.obs_stack[:, 1:, ...], None
+        seq_batch.obs_stack[:, :-1, ...],
+        seq_batch.actions,
+        seq_batch.obs_stack[:, 1:, ...],
+        None,
     )
 
     # Loss of reward sign
