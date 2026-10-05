@@ -1,18 +1,22 @@
 [project]
-name = "diamondrl"
+name = "neverwake"
 version = "0.1.0"
 description = "Diffusion world model"
 readme = "README.md"
 requires-python = ">=3.11"
 
 dependencies = [
+    "dacite>=1.9.2",
     "gymnasium[atari]>=1.2.3",
     "matplotlib>=3.11.1",
     "numpy>=2.4.2",
+    "pillow>=12.3.0",
+    "pyyaml>=6.0.3",
     "stable-baselines3>=2.9.0",
     "torch>=2.13.0",
     "torchvision>=0.28.0",
     "tqdm>=4.70.0",
+    "wandb>=0.30.0",
 ]
 
 [dependency-groups]
@@ -21,6 +25,7 @@ dev = [
     "ruff",
     "ipykernel>=7.1.0",
     "ipython>=9.9.0",
+    "modal>=1.6.0",
 ] 
 
 [[tool.uv.index]]
