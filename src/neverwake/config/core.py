@@ -13,6 +13,9 @@ class DenoiserConfig:
 
     group_size: int
     cond_dim: int
+    num_heads: int | None  # Midcoder self-attention heads, None disables it
+    fourier_w_min: float  # Range of the sigma embedding's frequencies
+    fourier_w_max: float
 
     rho: float
 
@@ -29,10 +32,12 @@ class DenoiserConfig:
 class RewardEndConfig:
     inp_proj_ch: int
     channels: tuple[int, ...]
+    final_res_attn_ch: int  # Channels of the final self-attention blocks
     downsample_after: tuple[bool, ...]
     lstm_dim: int
     group_size: int
     cond_dim: int
+    num_heads: int
 
 
 @dataclass

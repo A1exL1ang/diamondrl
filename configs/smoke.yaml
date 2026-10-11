@@ -15,6 +15,9 @@ denoiser:
   enc_dec_channels: [32, 32]
   group_size: 32
   cond_dim: 64
+  num_heads: 4
+  fourier_w_min: 0.2
+  fourier_w_max: 15.0
   rho: 7.0
   sigma_data: 0.5
   sigma_off: 0.3
@@ -24,10 +27,12 @@ denoiser:
 
 reward_end:
   inp_proj_ch: 32
-  channels: [32, 32]
-  downsample_after: [true, true]
+  channels: [32, 32, 32, 32]
+  final_res_attn_ch: 32
+  downsample_after: [false, true, false, true]
   lstm_dim: 64
   group_size: 32
+  num_heads: 4
   cond_dim: 64
 
 actor_critic:

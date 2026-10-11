@@ -7,16 +7,20 @@ from neverwake.modules.blocks import ResBlockCond, init_lstm
 class RewardEndModel(nn.Module):
     def __init__(
         self,
-        inp_shape: tuple[int, int, int],  # Stack obs and next_obs
+        inp_shape: tuple[int, int, int],  # Cat obs and next_obs
         inp_proj_ch: int,
         channels: tuple[int, ...],
+        final_res_attn_ch: int,
         downsample_after: tuple[bool, ...],
         lstm_dim: int,
         group_size: int,
         num_actions: int,
         cond_dim: int,
+        num_heads: int,
     ):
         super().__init__()
+
+        # TODO: assert that channels has content
 
         self.action_emb = nn.Embedding(num_actions, cond_dim)
         self.inp_proj = nn.Conv2d(inp_shape[0], inp_proj_ch, 3, padding=1)
@@ -30,6 +34,7 @@ class RewardEndModel(nn.Module):
             (inp_proj_ch,) + channels[:-1], channels, downsample_after, strict=True
         ):
             self.blocks.append(ResBlockCond(group_size, prev_ch, cur_ch, cond_dim))
+
             self.potential_downsamples.append(
                 nn.MaxPool2d(2) if do_down else nn.Identity()
             )
@@ -38,7 +43,23 @@ class RewardEndModel(nn.Module):
                 final_h //= 2
                 final_w //= 2
 
-        final_flat = channels[-1] * final_h * final_w
+        # Final self-attention blocks
+        self.final_res_attn_blocks = nn.ModuleList(
+            [
+                ResBlockCond(
+                    group_size, channels[-1], final_res_attn_ch, cond_dim, num_heads
+                ),
+                ResBlockCond(
+                    group_size,
+                    final_res_attn_ch,
+                    final_res_attn_ch,
+                    cond_dim,
+                    num_heads,
+                ),
+            ]
+        )
+
+        final_flat = final_res_attn_ch * final_h * final_w
         self.lstm = nn.LSTM(final_flat, lstm_dim, batch_first=True)
 
         self.head = nn.Sequential(
@@ -77,6 +98,9 @@ class RewardEndModel(nn.Module):
         ):
             enc = block(enc, cond_emb)
             enc = potential_downsample(enc)
+
+        for block in self.final_res_attn_blocks:
+            enc = block(enc, cond_emb)
 
         # enc is now (B * T, C, H, W) and we need to turn it into (B, T, dim)
         enc = enc.reshape(batch, seq, -1)

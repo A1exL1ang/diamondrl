@@ -6,7 +6,14 @@ from neverwake.modules.blocks import ResBlockCond
 
 
 class DownBlock(nn.Module):
-    def __init__(self, group_size: int, in_ch: int, block_ch: int, cond_dim: int):
+    def __init__(
+        self,
+        group_size: int,
+        in_ch: int,
+        block_ch: int,
+        cond_dim: int,
+        down_sample: bool,
+    ):
         super().__init__()
 
         self.res_blocks = nn.ModuleList(
@@ -16,8 +23,10 @@ class DownBlock(nn.Module):
             ]
         )
         # (h // 2, w // 2)
-        self.down_sample = nn.Conv2d(
-            block_ch, block_ch, kernel_size=3, stride=2, padding=1
+        self.down_sample = (
+            nn.Conv2d(block_ch, block_ch, kernel_size=3, stride=2, padding=1)
+            if down_sample
+            else nn.Identity()
         )
 
     def forward(
@@ -65,6 +74,7 @@ class Unet(nn.Module):
         out_ch: int,
         group_size: int,
         cond_dim: int,
+        num_heads: int | None,
     ):
         super().__init__()
 
@@ -87,14 +97,21 @@ class Unet(nn.Module):
                 else midcoder_ch
             )
 
-            self.down_blocks.append(DownBlock(group_size, in_ch, block_ch, cond_dim))
+            # Note: don't sample on the last one
+            down_sample = i + 1 < len(enc_dec_channels)
+
+            self.down_blocks.append(
+                DownBlock(group_size, in_ch, block_ch, cond_dim, down_sample)
+            )
             self.up_blocks.append(UpBlock(group_size, up_in_ch, block_ch, cond_dim))
 
-        # Midcoder
+        # Midcoder with self-attention
         self.midcoder = nn.ModuleList(
             [
-                ResBlockCond(group_size, enc_dec_channels[-1], midcoder_ch, cond_dim),
-                ResBlockCond(group_size, midcoder_ch, midcoder_ch, cond_dim),
+                ResBlockCond(
+                    group_size, enc_dec_channels[-1], midcoder_ch, cond_dim, num_heads
+                ),
+                ResBlockCond(group_size, midcoder_ch, midcoder_ch, cond_dim, num_heads),
             ]
         )
 
@@ -113,7 +130,7 @@ class Unet(nn.Module):
         skips: list[torch.Tensor] = []
 
         for block in self.down_blocks:
-            # Note that skip is the result prior to downsampling
+            # Note that skip is the result prior to downsampling (if it is done)
             x, skip = block(x, cond_emb)
             skips.append(skip)
 

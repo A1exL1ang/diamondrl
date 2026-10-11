@@ -5,7 +5,7 @@ import torch.nn as nn
 class FourierEncoding(nn.Module):
     freqs: torch.Tensor
 
-    def __init__(self, emb_dim: int, w_min: float = 0.2, w_max: float = 15.0):
+    def __init__(self, emb_dim: int, w_min: float, w_max: float):
         super().__init__()
         freqs = (
             (2 * torch.pi)
@@ -29,7 +29,14 @@ class FourierEncoding(nn.Module):
 
 
 class CondEmbedder(nn.Module):
-    def __init__(self, cond_dim: int, ctx_steps: int, num_actions: int):
+    def __init__(
+        self,
+        cond_dim: int,
+        ctx_steps: int,
+        num_actions: int,
+        w_min: float,
+        w_max: float,
+    ):
         super().__init__()
         if cond_dim % 2 != 0:
             raise ValueError(f"cond_dim {cond_dim} should be even")
@@ -38,7 +45,7 @@ class CondEmbedder(nn.Module):
                 f"cond_dim {cond_dim} should be a multiple of ctx_steps {ctx_steps}"
             )
 
-        self.sigma_emb = FourierEncoding(cond_dim)
+        self.sigma_emb = FourierEncoding(cond_dim, w_min, w_max)
         self.action_emb = nn.Embedding(num_actions, cond_dim // ctx_steps)
 
         self.cond_mlp = nn.Sequential(

@@ -150,14 +150,16 @@ activemq-data/
 *.sage.py
 
 # Environments
+# Note: anchored to the root since Windows git ignores case, so ENV/ also hid
+# src/neverwake/env/
 .env
 .envrc
 .venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+/env/
+/venv/
+/ENV/
+/env.bak/
+/venv.bak/
 
 # Spyder project settings
 .spyderproject
@@ -218,3 +220,24 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project
+# Training runs (neverwake's default --runs-dir) and wandb logs
+runs/
+wandb/
+
+# Downloaded datasets (e.g. CIFAR-10 for diffusion_exp)
+diffusion_exp/data/
+
+# Experiment outputs (metrics and sample images)
+diffusion_exp/results/
+
+# Saved episodes and model weights
+*.pt
+*.pth
+*.ckpt
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/

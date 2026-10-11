@@ -29,20 +29,17 @@ def sampler(
         device=device,
     )
 
-    sigmas = (
-        [
-            (
-                sigma_max_ode ** (1 / rho)
-                + i
-                / (denoising_steps - 1)
-                * (sigma_min_ode ** (1 / rho) - sigma_max_ode ** (1 / rho))
-            )
-            ** rho
-            for i in range(denoising_steps)
-        ]
-        if denoising_steps > 1
-        else [sigma_max_ode]
-    )
+    # We replace the last point of sigma_min with 0 instead since 0.002 -> 0 is wasteful
+    sigmas = [
+        (
+            sigma_max_ode ** (1 / rho)
+            + i
+            / denoising_steps
+            * (sigma_min_ode ** (1 / rho) - sigma_max_ode ** (1 / rho))
+        )
+        ** rho
+        for i in range(denoising_steps)
+    ]
     sigmas = torch.tensor(sigmas + [0.0], device=device)
 
     for i in range(denoising_steps):

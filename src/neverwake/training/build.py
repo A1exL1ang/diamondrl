@@ -34,12 +34,15 @@ def build_agent(cfg: Config, env: AbstractEnv) -> Agent:
         out_ch=frame_ch,
         group_size=cfg.denoiser.group_size,
         cond_dim=cfg.denoiser.cond_dim,
+        num_heads=cfg.denoiser.num_heads,
     )
 
     cond_embedder = CondEmbedder(
         cond_dim=cfg.denoiser.cond_dim,
         ctx_steps=cfg.world.ctx_frames,
         num_actions=num_actions,
+        w_min=cfg.denoiser.fourier_w_min,
+        w_max=cfg.denoiser.fourier_w_max,
     )
 
     denoiser = Denoiser(
@@ -62,11 +65,13 @@ def build_agent(cfg: Config, env: AbstractEnv) -> Agent:
         inp_shape=(frame_ch * 2, frame_h, frame_w),
         inp_proj_ch=cfg.reward_end.inp_proj_ch,
         channels=cfg.reward_end.channels,
+        final_res_attn_ch=cfg.reward_end.final_res_attn_ch,
         downsample_after=cfg.reward_end.downsample_after,
         lstm_dim=cfg.reward_end.lstm_dim,
         group_size=cfg.reward_end.group_size,
         num_actions=num_actions,
         cond_dim=cfg.reward_end.cond_dim,
+        num_heads=cfg.reward_end.num_heads,
     )
 
     actor_critic = ActorCriticModel(
