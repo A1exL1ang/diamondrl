@@ -48,8 +48,11 @@ class Collector:
         num_actions = self.env.all_actions.shape[0]
 
         for _ in range(num_env_steps):
-            # Action
-            with torch.no_grad():
+            # Eager since would be over-written and
+            # different batch from usual and want to keep under 8
+            stance = torch.compiler.set_stance("force_eager")  # type: ignore[attr-defined]
+
+            with torch.no_grad(), stance:
                 policy_logits, _, self.lstm_state = self.actor_critic(
                     self.obs.unsqueeze(0).to(device), self.lstm_state
                 )

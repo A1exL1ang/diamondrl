@@ -36,7 +36,13 @@ class BatchedWorldStepper:
         self.next_obs_model = next_obs_model
         self.reward_end = reward_end
 
-        with torch.no_grad():
+        self.device_type = obs_ctx_stack_init.device.type
+        self.use_bf16 = self.device_type == "cuda"
+
+        with (
+            torch.no_grad(),
+            torch.autocast(self.device_type, torch.bfloat16, enabled=self.use_bf16),
+        ):
             self.lstm_state: tuple[torch.Tensor, torch.Tensor] | None = (
                 self.reward_end(
                     self.obs_ctx_stack[:, :-1, ...],
@@ -54,16 +60,18 @@ class BatchedWorldStepper:
         """
         actions: (B,)
         """
-        # First get the next state
-        # (B, C, H, W)
-        with torch.no_grad():
+        with (
+            torch.no_grad(),
+            torch.autocast(self.device_type, torch.bfloat16, enabled=self.use_bf16),
+        ):
+            # First get the next state
+            # (B, C, H, W)
             next_obs = self.next_obs_model.next_obs_sample(
                 self.obs_ctx_stack,
                 torch.cat([self.action_seq, actions.unsqueeze(1)], dim=1),
             )
 
-        # Sequence size of 1
-        with torch.no_grad():
+            # Sequence size of 1
             reward_logits, end_logits, self.lstm_state = self.reward_end(
                 self.obs_ctx_stack[:, -1:, ...],
                 actions.unsqueeze(1),
@@ -79,4 +87,8 @@ class BatchedWorldStepper:
             self.action_seq[:, :-1] = self.action_seq[:, 1:].clone()
             self.action_seq[:, -1] = actions
 
-        return next_obs, reward_logits.squeeze(1), end_logits.squeeze(1)
+        return (
+            next_obs.float(),
+            reward_logits.squeeze(1).float(),
+            end_logits.squeeze(1).float(),
+        )

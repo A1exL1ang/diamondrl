@@ -61,11 +61,14 @@ class Evaluator:
         finished = False
 
         while len(actions) < max_steps:
-            # Action
-            with torch.no_grad():
+            # Eager since would be over-written and
+            # different batch from usual and want to keep under 8
+            stance = torch.compiler.set_stance("force_eager")  # type: ignore[attr-defined]
+            with torch.no_grad(), stance:
                 policy_logits, value, lstm_state = self.actor_critic(
                     obs.unsqueeze(0).to(device), lstm_state
                 )
+
             policy_logits = policy_logits.squeeze(0)
 
             action = Categorical(logits=policy_logits).sample().item()

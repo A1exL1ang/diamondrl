@@ -57,6 +57,13 @@ def init_state(
     agent.reward_end.to(device)
     agent.actor_critic.to(device)
 
+    # Compile in-place
+    if device.type == "cuda":
+        torch.backends.cudnn.benchmark = True
+        agent.denoiser.compile(mode="reduce-overhead", dynamic=False)
+        agent.reward_end.compile(mode="reduce-overhead", dynamic=False)
+        agent.actor_critic.compile(mode="reduce-overhead", dynamic=False)
+
     # Other stuff
     optimizers = build_optimizers(cfg, agent)
     replay_buffer = ReplayBuffer(cfg.train.sample_weights)
@@ -112,6 +119,7 @@ def train(
     cfg: Config, state: TrainState, tel: Telemetry, checkpointer: Checkpointer
 ) -> None:
     device = next(state.agent.denoiser.parameters()).device
+    use_bf16 = device.type == "cuda"
 
     while True:
         is_first = state.epoch == 0
@@ -143,14 +151,18 @@ def train(
                 ctx_frames=cfg.world.ctx_frames,
                 future_frames=denoiser_cfg.future_frames,
             ).to(device)
-            loss_denoiser, info_denoiser = denoiser_loss(
-                denoiser=state.agent.denoiser,
-                context_batch=context_batch,
-                sigma_min=denoiser_cfg.sigma_min,
-                sigma_max=denoiser_cfg.sigma_max,
-                p_mean=denoiser_cfg.p_mean,
-                p_std=denoiser_cfg.p_std,
-            )
+
+            torch.compiler.cudagraph_mark_step_begin()
+
+            with torch.autocast(device.type, torch.bfloat16, enabled=use_bf16):
+                loss_denoiser, info_denoiser = denoiser_loss(
+                    denoiser=state.agent.denoiser,
+                    context_batch=context_batch,
+                    sigma_min=denoiser_cfg.sigma_min,
+                    sigma_max=denoiser_cfg.sigma_max,
+                    p_mean=denoiser_cfg.p_mean,
+                    p_std=denoiser_cfg.p_std,
+                )
             grad_norm = state.optimizers.denoiser.update(loss_denoiser)
             tel.update("denoiser", loss_denoiser, info_denoiser, grad_norm)
 
@@ -165,9 +177,14 @@ def train(
                 batch_size=reward_end_cfg.batch_size,
                 num_transitions=cfg.world.ctx_frames + cfg.world.horizon,
             ).to(device)
-            loss_reward_end, info_reward_end = reward_end_loss(
-                state.agent.reward_end, seq_batch
-            )
+
+            torch.compiler.cudagraph_mark_step_begin()
+
+            with torch.autocast(device.type, torch.bfloat16, enabled=use_bf16):
+                loss_reward_end, info_reward_end = reward_end_loss(
+                    state.agent.reward_end, seq_batch
+                )
+
             grad_norm = state.optimizers.reward_end.update(loss_reward_end)
             tel.update("reward_end", loss_reward_end, info_reward_end, grad_norm)
 
@@ -187,6 +204,8 @@ def train(
                 future_frames=0,
             ).to(device)
 
+            torch.compiler.cudagraph_mark_step_begin()
+
             traj = rollout(
                 actor_critic=state.agent.actor_critic,
                 reward_end=state.agent.reward_end,
@@ -204,7 +223,9 @@ def train(
                 gamma=cfg.train.rl.gamma,
             )
             tel.imagination(traj)
+
             grad_norm = state.optimizers.actor_critic.update(loss_actor_critic)
+
             tel.update("actor_critic", loss_actor_critic, info_actor_critic, grad_norm)
 
         tel.lap("actor_critic")
