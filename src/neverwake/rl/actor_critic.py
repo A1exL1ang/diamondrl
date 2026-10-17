@@ -50,12 +50,10 @@ class ActorCriticModel(nn.Module):
         self.value_head = nn.Linear(lstm_dim, 1)
 
         # Init
+        # Note: unlike DIAMOND the heads keep their random init (like IRIS), so a low
+        # collection temperature commits to actions and the policy keeps moving
+        # before any reward is seen (needed for Freeway)
         init_lstm(self.lstm_cell)
-
-        # Note: unlike DIAMOND the value head keeps its random init, which gives noisy
-        # advantages before any reward is seen and keeps the policy moving (Freeway)
-        nn.init.zeros_(self.policy_head.weight)
-        nn.init.zeros_(self.policy_head.bias)
 
     def forward(
         self, obs: torch.Tensor, lstm_state: tuple[torch.Tensor, torch.Tensor] | None
