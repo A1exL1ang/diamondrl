@@ -52,6 +52,7 @@ train:
 
   collection:
     eps: 0.01
+    temperature: 1.0
     init_min_env_steps: 300
     init_max_env_steps: 400
     init_min_reward_steps: 1

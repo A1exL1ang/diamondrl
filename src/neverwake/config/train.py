@@ -4,6 +4,7 @@ from dataclasses import dataclass
 @dataclass
 class CollectionConfig:
     eps: float
+    temperature: float
     init_min_env_steps: int
     init_max_env_steps: int
     init_min_reward_steps: int

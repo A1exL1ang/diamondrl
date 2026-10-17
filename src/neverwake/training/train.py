@@ -74,6 +74,7 @@ def init_state(
         replay_buffer=replay_buffer,
         actor_critic=agent.actor_critic,
         eps=cfg.train.collection.eps,
+        temperature=cfg.train.collection.temperature,
         seed=derived_seed_train,
     )
 

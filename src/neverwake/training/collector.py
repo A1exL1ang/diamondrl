@@ -21,12 +21,14 @@ class Collector:
         replay_buffer: ReplayBuffer,
         actor_critic: ActorCriticModel,
         eps: float,
+        temperature: float,
         seed: int,
     ):
         self.env = env
         self.replay_buffer = replay_buffer
         self.actor_critic = actor_critic
         self.eps = eps
+        self.temperature = temperature
 
         # State
         self.obs, _ = self.env.reset(seed)  # Seeded here
@@ -58,7 +60,11 @@ class Collector:
                 )
             policy_logits = policy_logits.squeeze(0)
 
-            action = Categorical(logits=policy_logits).sample().item()
+            # Note: a low temperature (IRIS appendix H) holds actions for long
+            # stretches, which Freeway needs to ever cross the road
+            action = (
+                Categorical(logits=policy_logits / self.temperature).sample().item()
+            )
             if torch.rand(()).item() < self.eps:
                 action = torch.randint(0, num_actions, ()).item()
 
