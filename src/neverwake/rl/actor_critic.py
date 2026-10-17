@@ -52,9 +52,10 @@ class ActorCriticModel(nn.Module):
         # Init
         init_lstm(self.lstm_cell)
 
-        for head in (self.policy_head, self.value_head):
-            nn.init.zeros_(head.weight)
-            nn.init.zeros_(head.bias)
+        # Note: unlike DIAMOND the value head keeps its random init, which gives noisy
+        # advantages before any reward is seen and keeps the policy moving (Freeway)
+        nn.init.zeros_(self.policy_head.weight)
+        nn.init.zeros_(self.policy_head.bias)
 
     def forward(
         self, obs: torch.Tensor, lstm_state: tuple[torch.Tensor, torch.Tensor] | None
