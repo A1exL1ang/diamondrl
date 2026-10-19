@@ -3,10 +3,11 @@ name = "neverwake"
 version = "0.1.0"
 description = "Diffusion world model"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 
 dependencies = [
     "dacite>=1.9.2",
+    "gym-super-mario-bros>=9.1.0",
     "gymnasium[atari]>=1.2.3",
     "matplotlib>=3.11.1",
     "numpy>=2.4.2",
@@ -47,7 +48,7 @@ torchvision = { index = "pytorch-cu126" }
 package-dir = {"" = "src"}
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
@@ -56,6 +57,6 @@ select = ["E", "F", "I", "UP", "B"]
 convention = "numpy"
 
 [tool.basedpyright]
-pythonVersion = "3.11"
+pythonVersion = "3.13"
 typeCheckingMode = "standard" 
 include = ["src"]

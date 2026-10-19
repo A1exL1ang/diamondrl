@@ -9,9 +9,11 @@ from pathlib import Path
 import dacite
 
 from neverwake.config.core import Config
-from neverwake.config.env import AtariEnvConfig
+from neverwake.config.env import AtariEnvConfig, MarioForwardRewL1EnvConfig
 from neverwake.config.load import load_config
 from neverwake.env.atari import AtariEnv
+from neverwake.env.base import AbstractEnv
+from neverwake.env.mario_forward_rew_l1 import MarioForwardRewL1Env
 from neverwake.training.checkpoint import Checkpointer, load_checkpoint, purge, restore
 from neverwake.training.telemetry import Telemetry
 from neverwake.training.train import init_state, train
@@ -43,10 +45,13 @@ def same_config(path: Path, cfg: Config) -> bool:
 
 
 def run_name(cfg: Config) -> str:
-    if not isinstance(cfg.env, AtariEnvConfig):
-        raise ValueError(f"unsupported env config {type(cfg.env).__name__}")
     # e.g. SpaceInvaders --> space_invaders_20261003-101500
-    game = re.sub(r"(?<!^)(?=[A-Z])", "_", cfg.env.game).lower()
+    if isinstance(cfg.env, AtariEnvConfig):
+        game = re.sub(r"(?<!^)(?=[A-Z])", "_", cfg.env.game).lower()
+    elif isinstance(cfg.env, MarioForwardRewL1EnvConfig):
+        game = "mario_forward_rew_l1"
+    else:
+        raise ValueError(f"unsupported env config {type(cfg.env).__name__}")
     return f"{game}_{time.strftime('%Y%m%d-%H%M%S')}"
 
 
@@ -59,7 +64,17 @@ def run(run_dir: Path) -> None:
         return
 
     cfg = load_config(run_dir / "config.yaml")
-    if not isinstance(cfg.env, AtariEnvConfig):
+
+    # Training ends episodes on life loss, eval plays full games
+    train_env: AbstractEnv
+    eval_env: AbstractEnv
+    if isinstance(cfg.env, AtariEnvConfig):
+        train_env = AtariEnv(cfg.env)
+        eval_env = AtariEnv(replace(cfg.env, episodic_life=False))
+    elif isinstance(cfg.env, MarioForwardRewL1EnvConfig):
+        train_env = MarioForwardRewL1Env(cfg.env)
+        eval_env = MarioForwardRewL1Env(cfg.env)
+    else:
         raise ValueError(f"unsupported env config {type(cfg.env).__name__}")
 
     # Note that anything written after the checkpoint is deleted
@@ -69,9 +84,6 @@ def run(run_dir: Path) -> None:
     epoch = checkpoint["epoch"] if checkpoint is not None else 0
     run_id = checkpoint["run_id"] if checkpoint is not None else uuid.uuid4().hex[:8]
 
-    # Training ends episodes on life loss, eval plays full games
-    train_env = AtariEnv(cfg.env)
-    eval_env = AtariEnv(replace(cfg.env, episodic_life=False))
     state = init_state(cfg, train_env, eval_env, epoch)
 
     if checkpoint is not None:

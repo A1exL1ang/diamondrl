@@ -8,7 +8,7 @@ app = modal.App("neverwake")
 
 # Locked dependencies from uv.lock (no dev group), then our package and the configs
 image = (
-    modal.Image.debian_slim(python_version="3.11")
+    modal.Image.debian_slim(python_version="3.13")
     .uv_sync(extra_options="--no-dev")
     .add_local_python_source("neverwake")
     .add_local_dir("configs", remote_path="/root/configs")

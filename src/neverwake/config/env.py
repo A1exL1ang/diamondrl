@@ -17,3 +17,11 @@ class AtariEnvConfig(EnvConfig):
     game: str
     max_noop: int
     frameskip: int
+
+
+@dataclass
+class MarioForwardRewL1EnvConfig(EnvConfig):
+    rescaled_shape: tuple[int, int, int]
+    max_noop: int
+    frameskip: int
+    block_size: int  # Pixels of rightward progress per +1 reward
