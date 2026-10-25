@@ -9,10 +9,15 @@ from pathlib import Path
 import dacite
 
 from neverwake.config.core import Config
-from neverwake.config.env import AtariEnvConfig, MarioForwardRewL1EnvConfig
+from neverwake.config.env import (
+    AtariEnvConfig,
+    DoomHpSupBinRewEnvConfig,
+    MarioForwardRewL1EnvConfig,
+)
 from neverwake.config.load import load_config
 from neverwake.env.atari import AtariEnv
 from neverwake.env.base import AbstractEnv
+from neverwake.env.doom_hp_sup_bin_rew import DoomHpSupBinRewEnv
 from neverwake.env.mario_forward_rew_l1 import MarioForwardRewL1Env
 from neverwake.training.checkpoint import Checkpointer, load_checkpoint, purge, restore
 from neverwake.training.telemetry import Telemetry
@@ -50,6 +55,8 @@ def run_name(cfg: Config) -> str:
         game = re.sub(r"(?<!^)(?=[A-Z])", "_", cfg.env.game).lower()
     elif isinstance(cfg.env, MarioForwardRewL1EnvConfig):
         game = "mario_forward_rew_l1"
+    elif isinstance(cfg.env, DoomHpSupBinRewEnvConfig):
+        game = "doom_hp_sup_bin_rew"
     else:
         raise ValueError(f"unsupported env config {type(cfg.env).__name__}")
     return f"{game}_{time.strftime('%Y%m%d-%H%M%S')}"
@@ -74,6 +81,9 @@ def run(run_dir: Path) -> None:
     elif isinstance(cfg.env, MarioForwardRewL1EnvConfig):
         train_env = MarioForwardRewL1Env(cfg.env)
         eval_env = MarioForwardRewL1Env(cfg.env)
+    elif isinstance(cfg.env, DoomHpSupBinRewEnvConfig):
+        train_env = DoomHpSupBinRewEnv(cfg.env)
+        eval_env = DoomHpSupBinRewEnv(cfg.env)
     else:
         raise ValueError(f"unsupported env config {type(cfg.env).__name__}")
 

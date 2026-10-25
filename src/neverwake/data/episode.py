@@ -99,7 +99,8 @@ class Episode:
         ):
             raise ValueError("episode fields have inconsistent lengths")
 
-        self.observations = torch.stack(observations).detach().cpu().clone()
+        # Note: uint8 from EpisodeBuilder to save memory
+        self.observations = torch.stack(observations).detach().cpu()
         self.actions = torch.tensor(actions).long()
         self.rewards = torch.tensor(rewards).float()
         self.terminations = torch.tensor(terminations).bool()
@@ -117,10 +118,10 @@ class Episode:
             min=0, max=len(self.actions) - 1
         )
 
-        # (n, W, C, H, W) * (n, W, 1, 1, 1)
+        # (n, W, C, H, W) * (n, W, 1, 1, 1) after going back to [-1, +1]
         obs_stack = (
-            self.observations[safe_indices_obs] * good_obs[:, :, None, None, None]
-        )
+            self.observations[safe_indices_obs].float() / (255 / 2) - 1
+        ) * good_obs[:, :, None, None, None]
 
         # (n, W-1) * (n, W-1) with invalid ones zeroed out
         actions = self.actions[safe_indices_transition] * good_transition
@@ -209,9 +210,7 @@ class EpisodeBuilder:
         self,
         initial_observation: torch.Tensor,
     ) -> None:
-        self.observations: list[torch.Tensor] = [
-            initial_observation.detach().cpu().clone()
-        ]
+        self.observations: list[torch.Tensor] = [self.quantize(initial_observation)]
         self.actions: list[int] = []
         self.rewards: list[float] = []
         self.terminations: list[bool] = []
@@ -225,11 +224,17 @@ class EpisodeBuilder:
         termination: bool,
         epoch: int,
     ) -> None:
-        self.observations.append(observation.detach().cpu().clone())
+        self.observations.append(self.quantize(observation))
         self.actions.append(action)
         self.rewards.append(reward)
         self.terminations.append(termination)
         self.epochs.append(epoch)
+
+    def quantize(self, observation: torch.Tensor) -> torch.Tensor:
+        # [-1, +1] --> uint8 to save memory
+        return (
+            ((observation.detach().cpu() + 1) * (255 / 2)).round().clamp(0, 255).byte()
+        )
 
     def snapshot(self) -> Episode:
         return Episode(

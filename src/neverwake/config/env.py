@@ -25,3 +25,9 @@ class MarioForwardRewL1EnvConfig(EnvConfig):
     max_noop: int
     frameskip: int
     block_size: int  # Pixels of rightward progress per +1 reward
+
+
+@dataclass
+class DoomHpSupBinRewEnvConfig(EnvConfig):
+    rescaled_shape: tuple[int, int, int]
+    frameskip: int
