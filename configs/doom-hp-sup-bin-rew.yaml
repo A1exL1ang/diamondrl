@@ -52,8 +52,8 @@ train:
     init_min_env_steps: 5000
     init_max_env_steps: 10000
     init_min_reward_steps: 10
-    env_steps_per_epoch: 500
-    total_env_steps: 500000
+    env_steps_per_epoch: 1000
+    total_env_steps: 1000000
 
   denoiser:
     steps_init: 10000
