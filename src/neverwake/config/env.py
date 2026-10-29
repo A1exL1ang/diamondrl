@@ -31,3 +31,14 @@ class MarioForwardRewL1EnvConfig(EnvConfig):
 class DoomHpSupBinRewEnvConfig(EnvConfig):
     rescaled_shape: tuple[int, int, int]
     frameskip: int
+
+
+@dataclass
+class DoomDeathmatchKillRewEnvConfig(EnvConfig):
+    rescaled_shape: tuple[int, int, int]
+    frameskip: int
+
+
+@dataclass
+class CraftaxClassicAchRewEnvConfig(EnvConfig):
+    rescaled_shape: tuple[int, int, int]
