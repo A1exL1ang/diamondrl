@@ -15,6 +15,7 @@ from neverwake.config.env import (
     DoomDeathmatchKillRewEnvConfig,
     DoomHpSupBinRewEnvConfig,
     MarioForwardRewL1EnvConfig,
+    ProcgenEnvConfig,
 )
 from neverwake.config.load import load_config
 from neverwake.env.atari import AtariEnv
@@ -23,6 +24,7 @@ from neverwake.env.craftax_classic_ach_rew import CraftaxClassicAchRewEnv
 from neverwake.env.doom_deathmatch_kill_rew import DoomDeathmatchKillRewEnv
 from neverwake.env.doom_hp_sup_bin_rew import DoomHpSupBinRewEnv
 from neverwake.env.mario_forward_rew_l1 import MarioForwardRewL1Env
+from neverwake.env.procgen_env import ProcgenEnv
 from neverwake.training.checkpoint import Checkpointer, load_checkpoint, purge, restore
 from neverwake.training.telemetry import Telemetry
 from neverwake.training.train import init_state, train
@@ -65,6 +67,8 @@ def run_name(cfg: Config) -> str:
         game = "doom_deathmatch_kill_rew"
     elif isinstance(cfg.env, CraftaxClassicAchRewEnvConfig):
         game = "craftax_classic_ach_rew"
+    elif isinstance(cfg.env, ProcgenEnvConfig):
+        game = f"procgen_{cfg.env.game}"
     else:
         raise ValueError(f"unsupported env config {type(cfg.env).__name__}")
     return f"{game}_{time.strftime('%Y%m%d-%H%M%S')}"
@@ -98,6 +102,9 @@ def run(run_dir: Path) -> None:
     elif isinstance(cfg.env, CraftaxClassicAchRewEnvConfig):
         train_env = CraftaxClassicAchRewEnv(cfg.env)
         eval_env = CraftaxClassicAchRewEnv(cfg.env)
+    elif isinstance(cfg.env, ProcgenEnvConfig):
+        train_env = ProcgenEnv(cfg.env)
+        eval_env = ProcgenEnv(cfg.env)
     else:
         raise ValueError(f"unsupported env config {type(cfg.env).__name__}")
 

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from typing import Any
 
 import jax
@@ -30,6 +31,11 @@ class CraftaxClassicAchRewEnv(AbstractEnv):
         # Note: no frameskip since every action moves at most one tile
         self.env = craftax_pixels_env.CraftaxClassicPixelsEnvNoAutoReset()
         self.params = self.env.default_params
+
+        # Note: light follows timestep / day_length, so a day longer than any episode
+        # keeps the starting light of 0.797 (night static only starts below 0.5)
+        if cfg.always_day:
+            self.params = replace(self.params, day_length=10**9)
         self.env_step = jax.jit(self.env.step)
         self.env_reset = jax.jit(self.env.reset)
         self.num_actions = int(self.env.action_space(self.params).n)
@@ -74,6 +80,7 @@ class CraftaxClassicAchRewEnv(AbstractEnv):
     ) -> tuple[torch.Tensor, float, bool, bool, dict[str, Any]]:
         self.key, key = jax.random.split(self.key)
         achievements = int(self.state.achievements.sum())
+        health = int(self.state.player_health)
         obs, self.state, _, done, _ = self.env_step(
             key, self.state, action, self.params
         )
@@ -83,9 +90,13 @@ class CraftaxClassicAchRewEnv(AbstractEnv):
         truncated = bool(self.state.timestep >= self.params.max_timesteps)
         terminated = bool(done) and not truncated
 
-        # +1 for unlocking any new achievement, death overrides with -1
+        # +1 for unlocking any new achievement, -1 for losing health (0 if both), death
+        # overrides with -1
+        # Note: healing earns nothing, since a 2 or 7 point hit heals back over 2 or 7
+        # steps and the reward model only sees signs
         unlocked = int(self.state.achievements.sum()) > achievements
-        reward = -1.0 if terminated else float(unlocked)
+        hurt = self.cfg.health_penalty and int(self.state.player_health) < health
+        reward = -1.0 if terminated else float(unlocked) - float(hurt)
 
         # Every episode is a single life so it always ends the game
         info: dict[str, Any] = {"game_end": terminated or truncated}

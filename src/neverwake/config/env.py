@@ -42,3 +42,14 @@ class DoomDeathmatchKillRewEnvConfig(EnvConfig):
 @dataclass
 class CraftaxClassicAchRewEnvConfig(EnvConfig):
     rescaled_shape: tuple[int, int, int]
+    always_day: bool  # Light stays at the episode's starting level, so no night
+    health_penalty: bool  # -1 on any step that loses health
+
+
+@dataclass
+class ProcgenEnvConfig(EnvConfig):
+    rescaled_shape: tuple[int, int, int]
+    game: str  # e.g. starpilot
+    distribution_mode: str  # easy or hard
+    num_levels: int  # 0 for unlimited levels
+    start_level: int
