@@ -12,7 +12,6 @@ from neverwake.config.env import (
     DoomHpSupBinRewEnvConfig,
     EnvConfig,
     MarioForwardRewL1EnvConfig,
-    ProcgenEnvConfig,
 )
 
 
@@ -35,7 +34,6 @@ def env_config(data: dict[str, Any]) -> EnvConfig:
         "doom_hp_sup_bin_rew": DoomHpSupBinRewEnvConfig,
         "doom_deathmatch_kill_rew": DoomDeathmatchKillRewEnvConfig,
         "craftax_classic_ach_rew": CraftaxClassicAchRewEnvConfig,
-        "procgen": ProcgenEnvConfig,
     }
     env_fields = {k: v for k, v in data.items() if k != "type"}
 
