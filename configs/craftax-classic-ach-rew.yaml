@@ -3,6 +3,8 @@ seed: 42
 env:
   type: craftax_classic_ach_rew
   rescaled_shape: [3, 64, 64]
+  always_day: true
+  health_penalty: true
 
 denoiser:
   inp_proj_ch: 64
@@ -87,7 +89,7 @@ train:
     max_grad_norm: 100.0
 
   rl:
-    gamma: 0.985
+    gamma: 0.997
     lamb: 0.95
     weight_value: 1.0
     weight_entropy: 0.001

@@ -1,0 +1,115 @@
+seed: 42
+
+env:
+  type: atari
+  game: Asterix
+  rescaled_shape: [3, 64, 64]
+  episodic_life: true
+  max_noop: 30
+  frameskip: 4
+
+denoiser:
+  inp_proj_ch: 64
+  midcoder_ch: 64
+  enc_dec_channels: [64, 64, 64, 64]
+  group_size: 32
+  cond_dim: 256
+  num_heads: 8
+  fourier_w_min: 0.2
+  fourier_w_max: 15.0
+  rho: 7.0
+  sigma_data: 0.5
+  sigma_off: 0.3
+  sigma_min_ode: 2.0e-3
+  sigma_max_ode: 5.0
+  denoising_steps: 3
+
+reward_end:
+  inp_proj_ch: 32
+  channels: [32, 32, 32, 32, 32, 32, 32, 32]
+  final_res_attn_ch: 32
+  downsample_after: [false, true, false, true, false, true, false, false]
+  lstm_dim: 512
+  group_size: 32
+  num_heads: 4
+  cond_dim: 128
+
+actor_critic:
+  inp_proj_ch: 32
+  channels: [32, 32, 64, 64]
+  downsample_after: [true, true, true, true]
+  lstm_dim: 512
+  group_size: 32
+
+world:
+  ctx_frames: 4
+  horizon: 15
+
+train:
+  sample_weights: [0.1, 0.1, 0.1, 0.7]
+  epochs_after_collection: 50
+
+  collection:
+    eps: 0.01
+    temperature: 1.0
+    init_min_env_steps: 5000
+    init_max_env_steps: 10000
+    init_min_reward_steps: 10
+    env_steps_per_epoch: 100
+    total_env_steps: 100000
+
+  denoiser:
+    steps_init: 10000
+    steps_per_epoch: 400
+    batch_size: 32
+    lr: 1.0e-4
+    weight_decay: 1.0e-2
+    warmup_steps: 100
+    max_grad_norm: 1.0
+    future_frames: 2
+    p_mean: -0.4
+    p_std: 1.2
+    sigma_min: 2.0e-3
+    sigma_max: 20.0
+
+  reward_end:
+    steps_init: 10000
+    steps_per_epoch: 400
+    batch_size: 32
+    lr: 1.0e-4
+    weight_decay: 1.0e-2
+    warmup_steps: 100
+    max_grad_norm: 100.0
+
+  actor_critic:
+    steps_init: 5000
+    steps_per_epoch: 400
+    batch_size: 32
+    lr: 1.0e-4
+    weight_decay: 0.0
+    warmup_steps: 100
+    max_grad_norm: 100.0
+
+  rl:
+    gamma: 0.985
+    lamb: 0.95
+    weight_value: 1.0
+    weight_entropy: 0.001
+
+  eval:
+    every: 10
+    num_games: 4
+    num_games_final: 100
+    max_steps_per_game: 27000
+    eps: 0.0
+
+telemetry:
+  project: neverwake
+  mode: online
+  flush_every: 50
+  video_every: 10
+  video_max_frames: 500
+  video_clips: 4
+  video_scale: 2
+  save_every: 50
+  stats_interval_sec: 10.0
