@@ -34,7 +34,7 @@ class SelfAttention2d(nn.Module):
         self.qkv_proj = nn.Linear(ch, ch * 3)
         self.out_proj = nn.Linear(ch, ch)
 
-        # Note: zero init so the block starts as the identity
+        # Note: zero init so the block starts as just the norm (attention adds nothing)
         nn.init.zeros_(self.out_proj.weight)
         nn.init.zeros_(self.out_proj.bias)
 
@@ -46,10 +46,12 @@ class SelfAttention2d(nn.Module):
         """
         batch_size, ch, height, width = x.shape
 
-        h = self.norm(x)
+        # Note: we add norm along the residual path which makes it differ from
+        # the standard pre-norm ideas but makes it consistent with the paper I guess
+        x = self.norm(x)
 
         # (B, C, H, W) --> (B, H*W, C)
-        h = h.flatten(2).transpose(1, 2)
+        h = x.flatten(2).transpose(1, 2)
         q, k, v = torch.chunk(self.qkv_proj(h), chunks=3, dim=2)
 
         # (B, H*W, C) --> (B, H*W, heads, C / heads) --> (B, heads, H*W, C / heads)
@@ -106,6 +108,10 @@ class ResBlockCond(nn.Module):
             if num_heads is not None
             else nn.Identity()
         )
+
+        # Note: zero init the last conv so the residual branch starts as only its bias
+        # which is consistent with the paper
+        nn.init.zeros_(self.units[-1].get_parameter("conv.weight"))
 
     def forward(self, x: torch.Tensor, cond_emb: torch.Tensor) -> torch.Tensor:
         h = x
