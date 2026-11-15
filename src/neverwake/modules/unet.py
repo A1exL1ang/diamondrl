@@ -134,13 +134,25 @@ class Unet(nn.Module):
                 UpBlock(group_size, below_ch, block_ch, in_ch, cond_dim, not is_deepest)
             )
 
-        # Midcoder with self-attention
+        # Midcoder with cross-attention to the cond and self-attention
         self.midcoder = nn.ModuleList(
             [
                 ResBlockCond(
-                    group_size, enc_dec_channels[-1], midcoder_ch, cond_dim, num_heads
+                    group_size,
+                    enc_dec_channels[-1],
+                    midcoder_ch,
+                    cond_dim,
+                    num_heads,
+                    cross_attn=True,
                 ),
-                ResBlockCond(group_size, midcoder_ch, midcoder_ch, cond_dim, num_heads),
+                ResBlockCond(
+                    group_size,
+                    midcoder_ch,
+                    midcoder_ch,
+                    cond_dim,
+                    num_heads,
+                    cross_attn=True,
+                ),
             ]
         )
 

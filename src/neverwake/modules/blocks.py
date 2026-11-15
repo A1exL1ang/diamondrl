@@ -72,6 +72,36 @@ class SelfAttention2d(nn.Module):
         return x + h
 
 
+class CrossAttention2d(nn.Module):
+    def __init__(self, ch: int, group_size: int, cond_dim: int):
+        assert group_size > 0 and ch % group_size == 0
+
+        super().__init__()
+
+        self.norm = nn.GroupNorm(ch // group_size, num_channels=ch)
+        self.cond_proj = nn.Linear(cond_dim, ch)
+
+        # Note: zero init so the block starts as just the norm (the cond adds nothing)
+        nn.init.zeros_(self.cond_proj.weight)
+        nn.init.zeros_(self.cond_proj.bias)
+
+    def forward(self, x: torch.Tensor, cond_emb: torch.Tensor) -> torch.Tensor:
+        """
+        x: (B, C, H, W)
+        cond_emb: (B, cond_dim)
+
+        Every pixel attends to cond_emb, which is a single token. With only one key
+        the attention weights are all 1, so there are no queries or keys: every pixel
+        gets the same value vector. The value and out projections are two linear
+        layers in a row, so they are merged into one
+        """
+        # (B, cond_dim) --> (B, C) --> (B, C, 1, 1)
+        h = self.cond_proj(cond_emb)[:, :, None, None]
+
+        # Note: same as SelfAttention2d, the residual is taken from the normed x
+        return self.norm(x) + h
+
+
 class ResBlockSingleBasic(nn.Module):
     def __init__(self, group_size: int, in_ch: int, out_ch: int):
         super().__init__()
@@ -92,6 +122,7 @@ class ResBlockCond(nn.Module):
         out_ch: int,
         cond_dim: int,
         num_heads: int | None = None,
+        cross_attn: bool = False,
     ):
         super().__init__()
 
@@ -103,10 +134,13 @@ class ResBlockCond(nn.Module):
         )
         self.skip = nn.Identity() if in_ch == out_ch else nn.Conv2d(in_ch, out_ch, 1)
 
-        self.attn = (
+        self.cross_attn = (
+            CrossAttention2d(out_ch, group_size, cond_dim) if cross_attn else None
+        )
+        self.self_attn = (
             SelfAttention2d(out_ch, group_size, num_heads)
             if num_heads is not None
-            else nn.Identity()
+            else None
         )
 
         # Note: zero init the last conv so the residual branch starts as only its bias
@@ -117,7 +151,14 @@ class ResBlockCond(nn.Module):
         h = x
         for unit in self.units:
             h = unit(h, cond_emb)
-        return self.attn(self.skip(x) + h)
+        h = self.skip(x) + h
+
+        # Cross-attention to the cond comes before the self-attention
+        if self.cross_attn is not None:
+            h = self.cross_attn(h, cond_emb)
+        if self.self_attn is not None:
+            h = self.self_attn(h)
+        return h
 
 
 def init_lstm(lstm: nn.Module) -> None:
