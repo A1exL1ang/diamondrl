@@ -1265,6 +1265,18 @@ wheels = [
 ]
 
 [[package]]
+name = "mambapy"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/92/4e/b0c2310e8bb6be1212aae87bb0493fc7b0d6b79efee86f9bdecebbf21739/mambapy-1.2.0.tar.gz", hash = "sha256:594944bf59dc148b739cc63b7f5aea44d41c94949be5b7293529a199883ff744", size = 37645, upload-time = "2024-07-31T12:00:28.855Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5a/fa/45873bcff2bd443a48210d4889da03d7355df97e760141e94b624a838b36/mambapy-1.2.0-py3-none-any.whl", hash = "sha256:37372ae2b13621beb5f7d60c486efdedcd21f79a2608e3d5f47b937f3196c282", size = 40117, upload-time = "2024-07-31T12:00:27.064Z" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "4.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1710,6 +1722,7 @@ dependencies = [
     { name = "dacite" },
     { name = "gym-super-mario-bros" },
     { name = "gymnasium", extra = ["atari"] },
+    { name = "mambapy" },
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "pillow" },
@@ -1741,6 +1754,7 @@ requires-dist = [
     { name = "dacite", specifier = ">=1.9.2" },
     { name = "gym-super-mario-bros", specifier = ">=9.1.0" },
     { name = "gymnasium", extras = ["atari"], specifier = ">=1.2.3" },
+    { name = "mambapy", specifier = "==1.2.0" },
     { name = "matplotlib", specifier = ">=3.11.1" },
     { name = "numpy", specifier = ">=2.4.2" },
     { name = "pillow", specifier = ">=12.3.0" },
