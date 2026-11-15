@@ -25,7 +25,7 @@ class FourierEncoding(nn.Module):
             dim=-1,
         )
 
-        return emb * ((2 / self.emb_dim) ** 0.5)
+        return emb
 
 
 class CondEmbedder(nn.Module):
