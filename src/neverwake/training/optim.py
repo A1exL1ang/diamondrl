@@ -7,6 +7,28 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import LinearLR
 
 
+def decay_groups(model: nn.Module, weight_decay: float) -> list[dict[str, Any]]:
+    """
+    Only matrices and conv kernels are decayed. Biases, norm gains and lone scalars
+    (all ndim < 2) are left alone, and so are embeddings and Mamba's A_log (the log
+    of how fast each slot of its state forgets)
+    """
+    decay: list[nn.Parameter] = []
+    no_decay: list[nn.Parameter] = []
+
+    for module in model.modules():
+        for name, param in module.named_parameters(recurse=False):
+            if param.ndim < 2 or isinstance(module, nn.Embedding) or name == "A_log":
+                no_decay.append(param)
+            else:
+                decay.append(param)
+
+    return [
+        {"params": decay, "weight_decay": weight_decay},
+        {"params": no_decay, "weight_decay": 0.0},
+    ]
+
+
 class ModelOptimizer:
     def __init__(
         self,
@@ -18,11 +40,7 @@ class ModelOptimizer:
     ):
         self.model = model
 
-        self.opt = AdamW(
-            model.parameters(),
-            lr=lr,
-            weight_decay=weight_decay,
-        )
+        self.opt = AdamW(decay_groups(model, weight_decay), lr=lr)
         self.schedule = LinearLR(
             self.opt,
             start_factor=1 / warmup_steps,
@@ -58,6 +76,5 @@ class ModelOptimizer:
 
 @dataclass
 class Optimizers:
-    denoiser: ModelOptimizer
-    reward_end: ModelOptimizer
+    world_model: ModelOptimizer
     actor_critic: ModelOptimizer

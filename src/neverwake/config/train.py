@@ -13,7 +13,7 @@ class CollectionConfig:
 
 
 @dataclass
-class DenoiserTrainConfig:
+class WorldModelTrainConfig:
     steps_init: int
     steps_per_epoch: int
     batch_size: int
@@ -22,22 +22,12 @@ class DenoiserTrainConfig:
     warmup_steps: int
     max_grad_norm: float
 
+    # Denoiser
     future_frames: int
     p_mean: float
     p_std: float
     sigma_min: float
     sigma_max: float
-
-
-@dataclass
-class RewardEndTrainConfig:
-    steps_init: int
-    steps_per_epoch: int
-    batch_size: int
-    lr: float
-    weight_decay: float
-    warmup_steps: int
-    max_grad_norm: float
 
 
 @dataclass
@@ -74,8 +64,7 @@ class TrainConfig:
     epochs_after_collection: int
 
     collection: CollectionConfig
-    denoiser: DenoiserTrainConfig
-    reward_end: RewardEndTrainConfig
+    world_model: WorldModelTrainConfig
     actor_critic: ActorCriticTrainConfig
     rl: RLConfig
     eval: EvalConfig

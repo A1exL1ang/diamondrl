@@ -164,7 +164,7 @@ class Telemetry:
         self.evaluator = evaluator
 
         # The counters are plotted against the epoch, epoch prefixes against env steps
-        # and each model prefix (e.g. "denoiser") against its own update counter
+        # and each model prefix (e.g. "world_model") against its own update counter
         self.epoch_prefixes = ("collect", "eval", "eval_final", "sys", "media")
         self.model_names = [f.name for f in fields(optimizers)]
         axes: dict[str, str | None] = {
@@ -345,8 +345,9 @@ class Telemetry:
         console = {
             "ret": "collect/return",
             "eval": "eval/return",
-            "den": "denoiser/loss",
-            "rew": "reward_end/loss",
+            "den": "world_model/loss_denoiser",
+            "rew": "world_model/loss_reward",
+            "end": "world_model/loss_end",
             "ent": "actor_critic/entropy",
         }
         metrics = " | ".join(

@@ -22,18 +22,19 @@ class NextObsModel:
         self.denoising_steps = denoising_steps
 
     def next_obs_sample(
-        self, obs_ctx_stack: torch.Tensor, actions: torch.Tensor
+        self, obs_ctx_stack: torch.Tensor, memory_emb: torch.Tensor
     ) -> torch.Tensor:
         """
         obs_ctx_stack: (B, T, C, H, W)
-        actions: (B, T)
+        memory_emb: (B, memory_dim), has seen everything up to the last ctx and the
+                    action taken on it
         """
         obs_ctx_cat = obs_ctx_stack.flatten(1, 2)
 
         return sampler(
             self.denoiser,
             obs_ctx_cat,
-            actions,
+            memory_emb,
             self.obs_shape,
             self.rho,
             self.sigma_min_ode,

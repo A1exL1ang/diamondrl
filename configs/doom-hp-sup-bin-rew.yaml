@@ -21,15 +21,14 @@ denoiser:
   sigma_max_ode: 5.0
   denoising_steps: 3
 
-reward_end:
-  inp_proj_ch: 32
-  channels: [32, 32, 32, 32, 32, 32, 32, 32]
-  final_res_attn_ch: 32
-  downsample_after: [false, true, false, true, false, true, false, false]
-  lstm_dim: 512
+memory:
+  inp_proj_ch: 64
+  channels: [64, 64, 64, 64]
+  downsample_after: [true, true, true, true]
   group_size: 32
-  num_heads: 4
-  cond_dim: 128
+  action_dim: 128
+  mamba_dim: 512
+  mamba_layers: 3
 
 actor_critic:
   inp_proj_ch: 32
@@ -55,7 +54,7 @@ train:
     env_steps_per_epoch: 1000
     total_env_steps: 1000000
 
-  denoiser:
+  world_model:
     steps_init: 10000
     steps_per_epoch: 400
     batch_size: 32
@@ -68,15 +67,6 @@ train:
     p_std: 1.2
     sigma_min: 2.0e-3
     sigma_max: 20.0
-
-  reward_end:
-    steps_init: 10000
-    steps_per_epoch: 400
-    batch_size: 32
-    lr: 1.0e-4
-    weight_decay: 1.0e-2
-    warmup_steps: 100
-    max_grad_norm: 100.0
 
   actor_critic:
     steps_init: 5000

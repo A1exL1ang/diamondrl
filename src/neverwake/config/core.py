@@ -6,6 +6,17 @@ from neverwake.config.train import TrainConfig
 
 
 @dataclass
+class MemoryConfig:
+    inp_proj_ch: int
+    channels: tuple[int, ...]
+    downsample_after: tuple[bool, ...]
+    group_size: int
+    action_dim: int
+    mamba_dim: int  # Also the size of what the denoiser and reward / end heads read
+    mamba_layers: int
+
+
+@dataclass
 class DenoiserConfig:
     inp_proj_ch: int
     midcoder_ch: int
@@ -26,18 +37,6 @@ class DenoiserConfig:
     sigma_max_ode: float
 
     denoising_steps: int
-
-
-@dataclass
-class RewardEndConfig:
-    inp_proj_ch: int
-    channels: tuple[int, ...]
-    final_res_attn_ch: int  # Channels of the final self-attention blocks
-    downsample_after: tuple[bool, ...]
-    lstm_dim: int
-    group_size: int
-    cond_dim: int
-    num_heads: int
 
 
 @dataclass
@@ -73,8 +72,8 @@ class Config:
     seed: int
 
     env: EnvConfig
+    memory: MemoryConfig
     denoiser: DenoiserConfig
-    reward_end: RewardEndConfig
     actor_critic: ActorCriticConfig
     world: WorldConfig
     train: TrainConfig

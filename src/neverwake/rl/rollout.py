@@ -4,6 +4,7 @@ import torch
 from torch.distributions import Categorical
 
 from neverwake.rl.actor_critic import ActorCriticModel
+from neverwake.world.memory import MemoryModel
 from neverwake.world.next_obs_model import NextObsModel
 from neverwake.world.reward_end_model import RewardEndModel
 from neverwake.world.stepper import BatchedWorldStepper
@@ -38,8 +39,9 @@ class Trajectory:
 
 def rollout(
     actor_critic: ActorCriticModel,
-    reward_end: RewardEndModel,
+    memory: MemoryModel,
     next_obs_model: NextObsModel,
+    reward_end: RewardEndModel,
     obs_ctx_stack_init: torch.Tensor,
     action_seq_init: torch.Tensor,
     horizon: int,
@@ -51,6 +53,7 @@ def rollout(
 
     stepper = BatchedWorldStepper(
         ctx_frames,
+        memory,
         next_obs_model,
         reward_end,
         obs_ctx_stack_init,

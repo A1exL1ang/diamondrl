@@ -15,8 +15,7 @@ from neverwake.training.collector import Collector
 from neverwake.training.eval import Evaluator
 from neverwake.training.optim import Optimizers
 from neverwake.training.telemetry import Telemetry
-from neverwake.world.denoiser_loss import denoiser_loss
-from neverwake.world.reward_end_loss import reward_end_loss
+from neverwake.world.world_model_loss import world_model_loss
 
 
 @dataclass
@@ -53,16 +52,20 @@ def init_state(
 
     # Handle device here
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    agent.denoiser.to(device)
-    agent.reward_end.to(device)
+    agent.world_model.to(device)
     agent.actor_critic.to(device)
 
     # Compile in-place
     if device.type == "cuda":
         torch.backends.cudnn.benchmark = True
-        agent.denoiser.compile(mode="reduce-overhead", dynamic=False)
-        agent.reward_end.compile(mode="reduce-overhead", dynamic=False)
+        memory = agent.world_model.memory
+        memory.compile(mode="reduce-overhead", dynamic=False)
+        agent.world_model.denoiser.compile(mode="reduce-overhead", dynamic=False)
         agent.actor_critic.compile(mode="reduce-overhead", dynamic=False)
+
+        # Note: compile() only covers forward and imagination goes through step
+        # The reward / end heads are too small to be worth compiling
+        memory.step = torch.compile(memory.step, mode="reduce-overhead", dynamic=False)
 
     # Other stuff
     optimizers = build_optimizers(cfg, agent)
@@ -119,7 +122,7 @@ def initial_collect(cfg: Config, state: TrainState) -> None:
 def train(
     cfg: Config, state: TrainState, tel: Telemetry, checkpointer: Checkpointer
 ) -> None:
-    device = next(state.agent.denoiser.parameters()).device
+    device = next(state.agent.world_model.parameters()).device
     use_bf16 = device.type == "cuda"
 
     while True:
@@ -142,54 +145,33 @@ def train(
 
         tel.lap("collect")
 
-        # Denoiser
-        denoiser_cfg = cfg.train.denoiser
+        # World model (memory, denoiser and reward / end heads in one update)
+        world_model_cfg = cfg.train.world_model
         for _ in range(
-            denoiser_cfg.steps_init if is_first else denoiser_cfg.steps_per_epoch
-        ):
-            context_batch = state.replay_buffer.sample_context(
-                batch_size=denoiser_cfg.batch_size,
-                ctx_frames=cfg.world.ctx_frames,
-                future_frames=denoiser_cfg.future_frames,
-            ).to(device)
-
-            torch.compiler.cudagraph_mark_step_begin()
-
-            with torch.autocast(device.type, torch.bfloat16, enabled=use_bf16):
-                loss_denoiser, info_denoiser = denoiser_loss(
-                    denoiser=state.agent.denoiser,
-                    context_batch=context_batch,
-                    sigma_min=denoiser_cfg.sigma_min,
-                    sigma_max=denoiser_cfg.sigma_max,
-                    p_mean=denoiser_cfg.p_mean,
-                    p_std=denoiser_cfg.p_std,
-                )
-            grad_norm = state.optimizers.denoiser.update(loss_denoiser)
-            tel.update("denoiser", loss_denoiser, info_denoiser, grad_norm)
-
-        tel.lap("denoiser")
-
-        # Reward end
-        reward_end_cfg = cfg.train.reward_end
-        for _ in range(
-            reward_end_cfg.steps_init if is_first else reward_end_cfg.steps_per_epoch
+            world_model_cfg.steps_init if is_first else world_model_cfg.steps_per_epoch
         ):
             seq_batch = state.replay_buffer.sample_masked_sequence(
-                batch_size=reward_end_cfg.batch_size,
+                batch_size=world_model_cfg.batch_size,
                 num_transitions=cfg.world.ctx_frames + cfg.world.horizon,
             ).to(device)
 
             torch.compiler.cudagraph_mark_step_begin()
 
             with torch.autocast(device.type, torch.bfloat16, enabled=use_bf16):
-                loss_reward_end, info_reward_end = reward_end_loss(
-                    state.agent.reward_end, seq_batch
+                loss_world_model, info_world_model = world_model_loss(
+                    world_model=state.agent.world_model,
+                    seq_batch=seq_batch,
+                    ctx_frames=cfg.world.ctx_frames,
+                    future_frames=world_model_cfg.future_frames,
+                    sigma_min=world_model_cfg.sigma_min,
+                    sigma_max=world_model_cfg.sigma_max,
+                    p_mean=world_model_cfg.p_mean,
+                    p_std=world_model_cfg.p_std,
                 )
+            grad_norm = state.optimizers.world_model.update(loss_world_model)
+            tel.update("world_model", loss_world_model, info_world_model, grad_norm)
 
-            grad_norm = state.optimizers.reward_end.update(loss_reward_end)
-            tel.update("reward_end", loss_reward_end, info_reward_end, grad_norm)
-
-        tel.lap("reward_end")
+        tel.lap("world_model")
 
         # Actor critic
         actor_critic_cfg = cfg.train.actor_critic
@@ -209,8 +191,9 @@ def train(
 
             traj = rollout(
                 actor_critic=state.agent.actor_critic,
-                reward_end=state.agent.reward_end,
+                memory=state.agent.world_model.memory,
                 next_obs_model=state.agent.next_obs_model,
+                reward_end=state.agent.world_model.reward_end,
                 obs_ctx_stack_init=context_batch.obs_stack,
                 action_seq_init=context_batch.actions,
                 horizon=cfg.world.horizon,

@@ -1,5 +1,6 @@
 import torch
 
+from neverwake.world.memory import MemoryModel
 from neverwake.world.next_obs_model import NextObsModel
 from neverwake.world.reward_end_model import RewardEndModel
 
@@ -8,6 +9,7 @@ class BatchedWorldStepper:
     def __init__(
         self,
         ctx_frames: int,
+        memory: MemoryModel,
         next_obs_model: NextObsModel,
         reward_end: RewardEndModel,
         obs_ctx_stack_init: torch.Tensor,
@@ -18,10 +20,11 @@ class BatchedWorldStepper:
         action_seq_init: (B, T-1)
         Assume all states are current valid
 
-        Track last T ctx and last T-1 actions. When we query the obs model we
-        pass in the T ctx and append the final action to form T actions
+        Track the last T ctx for the denoiser. The actions only go through the
+        memory: it starts by reading the first T-1 ctx with their actions and then
+        every step it reads the last ctx with the new action
 
-        The reward model only uses the last ctx, new ctx and new action
+        The reward model only uses what the memory gives
         """
         if ctx_frames < 1:
             raise ValueError(f"ctx frames {ctx_frames} should be >= 1")
@@ -31,28 +34,26 @@ class BatchedWorldStepper:
             )
 
         self.obs_ctx_stack = obs_ctx_stack_init.clone()
-        self.action_seq = action_seq_init.clone()
 
+        self.memory = memory
         self.next_obs_model = next_obs_model
         self.reward_end = reward_end
 
         self.device_type = obs_ctx_stack_init.device.type
         self.use_bf16 = self.device_type == "cuda"
 
+        self.memory_state: tuple[torch.Tensor, torch.Tensor] | None = None
+
         with (
             torch.no_grad(),
             torch.autocast(self.device_type, torch.bfloat16, enabled=self.use_bf16),
         ):
-            self.lstm_state: tuple[torch.Tensor, torch.Tensor] | None = (
-                self.reward_end(
-                    self.obs_ctx_stack[:, :-1, ...],
-                    self.action_seq,
-                    self.obs_ctx_stack[:, 1:, ...],
-                    None,
-                )[2]
-                if ctx_frames > 1
-                else None
-            )
+            for idx in range(ctx_frames - 1):
+                _, self.memory_state = self.memory.step(
+                    self.obs_ctx_stack[:, idx, ...],
+                    action_seq_init[:, idx],
+                    self.memory_state,
+                )
 
     def step(
         self, actions: torch.Tensor
@@ -64,31 +65,21 @@ class BatchedWorldStepper:
             torch.no_grad(),
             torch.autocast(self.device_type, torch.bfloat16, enabled=self.use_bf16),
         ):
-            # First get the next state
-            # (B, C, H, W)
-            next_obs = self.next_obs_model.next_obs_sample(
-                self.obs_ctx_stack,
-                torch.cat([self.action_seq, actions.unsqueeze(1)], dim=1),
+            # The memory reads the last ctx with the action taken on it
+            memory_emb, self.memory_state = self.memory.step(
+                self.obs_ctx_stack[:, -1, ...], actions, self.memory_state
             )
 
-            # Sequence size of 1
-            reward_logits, end_logits, self.lstm_state = self.reward_end(
-                self.obs_ctx_stack[:, -1:, ...],
-                actions.unsqueeze(1),
-                next_obs.unsqueeze(1),
-                self.lstm_state,
+            # Then get the next state
+            # (B, C, H, W)
+            next_obs = self.next_obs_model.next_obs_sample(
+                self.obs_ctx_stack, memory_emb
             )
+
+            reward_logits, end_logits = self.reward_end(memory_emb)
 
         # Update
         self.obs_ctx_stack[:, :-1, ...] = self.obs_ctx_stack[:, 1:, ...].clone()
         self.obs_ctx_stack[:, -1, ...] = next_obs
 
-        if self.action_seq.shape[1] > 0:
-            self.action_seq[:, :-1] = self.action_seq[:, 1:].clone()
-            self.action_seq[:, -1] = actions
-
-        return (
-            next_obs.float(),
-            reward_logits.squeeze(1).float(),
-            end_logits.squeeze(1).float(),
-        )
+        return next_obs.float(), reward_logits.float(), end_logits.float()

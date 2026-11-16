@@ -29,35 +29,23 @@ class FourierEncoding(nn.Module):
 
 
 class CondEmbedder(nn.Module):
-    def __init__(
-        self,
-        cond_dim: int,
-        ctx_steps: int,
-        num_actions: int,
-        w_min: float,
-        w_max: float,
-    ):
+    def __init__(self, cond_dim: int, memory_dim: int, w_min: float, w_max: float):
         super().__init__()
         if cond_dim % 2 != 0:
             raise ValueError(f"cond_dim {cond_dim} should be even")
-        if cond_dim % ctx_steps != 0:
-            raise ValueError(
-                f"cond_dim {cond_dim} should be a multiple of ctx_steps {ctx_steps}"
-            )
 
         self.sigma_emb = FourierEncoding(cond_dim, w_min, w_max)
-        self.action_emb = nn.Embedding(num_actions, cond_dim // ctx_steps)
+        self.memory_proj = nn.Linear(memory_dim, cond_dim)
 
         self.cond_mlp = nn.Sequential(
             nn.Linear(cond_dim, cond_dim), nn.SiLU(), nn.Linear(cond_dim, cond_dim)
         )
 
     def forward(
-        self, sigma_transformed: torch.Tensor, actions: torch.Tensor
+        self, sigma_transformed: torch.Tensor, memory_emb: torch.Tensor
     ) -> torch.Tensor:
-        # Sigma transformed and number are (B,)
-        cond_emb = self.sigma_emb(sigma_transformed) + self.action_emb(actions).flatten(
-            start_dim=1
-        )
+        # Sigma transformed is (B,) and memory_emb is (B, memory_dim)
+        # Note: no action embedding since the memory has already seen the actions
+        cond_emb = self.sigma_emb(sigma_transformed) + self.memory_proj(memory_emb)
         cond_emb = self.cond_mlp(cond_emb)
         return cond_emb

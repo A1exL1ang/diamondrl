@@ -33,7 +33,7 @@ class Denoiser(nn.Module):
         obs_ctx_cat: torch.Tensor,
         noisy_x: torch.Tensor,
         sigma: torch.Tensor,
-        actions: torch.Tensor,
+        memory_emb: torch.Tensor,
     ) -> torch.Tensor:
         # Combine with sigma_off to get the real sigma and then rescale
         sigma_true = torch.sqrt(sigma**2 + self.sigma_off**2)
@@ -45,7 +45,7 @@ class Denoiser(nn.Module):
             self.sigma_data**2 + sigma_true**2
         )
 
-        cond_emb = self.cond_embedder(sigma_transformed, actions)
+        cond_emb = self.cond_embedder(sigma_transformed, memory_emb)
 
         # Make sure to avoid the bug of scaling what you condition on as well
         # We shouldn't scale obs_ctx by c_in but rather sigma_data for unit variance

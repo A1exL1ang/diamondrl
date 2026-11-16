@@ -7,15 +7,16 @@ from neverwake.modules.unet import Unet
 from neverwake.rl.actor_critic import ActorCriticModel
 from neverwake.training.optim import ModelOptimizer, Optimizers
 from neverwake.world.denoiser import Denoiser
+from neverwake.world.memory import MemoryModel
 from neverwake.world.next_obs_model import NextObsModel
 from neverwake.world.reward_end_model import RewardEndModel
+from neverwake.world.world_model import WorldModel
 
 
 @dataclass
 class Agent:
-    denoiser: Denoiser
+    world_model: WorldModel
     next_obs_model: NextObsModel
-    reward_end: RewardEndModel
     actor_critic: ActorCriticModel
 
 
@@ -25,6 +26,18 @@ def build_agent(cfg: Config, env: AbstractEnv) -> Agent:
 
     # TODO: have some value errors here to enforce some basic constraints
     # Or enforce the group size constraints upon construction actually
+
+    memory = MemoryModel(
+        inp_shape=(frame_ch, frame_h, frame_w),
+        inp_proj_ch=cfg.memory.inp_proj_ch,
+        channels=cfg.memory.channels,
+        downsample_after=cfg.memory.downsample_after,
+        group_size=cfg.memory.group_size,
+        num_actions=num_actions,
+        action_dim=cfg.memory.action_dim,
+        mamba_dim=cfg.memory.mamba_dim,
+        mamba_layers=cfg.memory.mamba_layers,
+    )
 
     u_net = Unet(
         inp_ch=frame_ch * (cfg.world.ctx_frames + 1),
@@ -39,8 +52,7 @@ def build_agent(cfg: Config, env: AbstractEnv) -> Agent:
 
     cond_embedder = CondEmbedder(
         cond_dim=cfg.denoiser.cond_dim,
-        ctx_steps=cfg.world.ctx_frames,
-        num_actions=num_actions,
+        memory_dim=cfg.memory.mamba_dim,
         w_min=cfg.denoiser.fourier_w_min,
         w_max=cfg.denoiser.fourier_w_max,
     )
@@ -52,6 +64,10 @@ def build_agent(cfg: Config, env: AbstractEnv) -> Agent:
         sigma_data=cfg.denoiser.sigma_data,
     )
 
+    reward_end = RewardEndModel(memory_dim=cfg.memory.mamba_dim)
+
+    world_model = WorldModel(memory=memory, denoiser=denoiser, reward_end=reward_end)
+
     next_obs_model = NextObsModel(
         denoiser=denoiser,
         obs_shape=(frame_ch, frame_h, frame_w),
@@ -59,19 +75,6 @@ def build_agent(cfg: Config, env: AbstractEnv) -> Agent:
         sigma_min_ode=cfg.denoiser.sigma_min_ode,
         sigma_max_ode=cfg.denoiser.sigma_max_ode,
         denoising_steps=cfg.denoiser.denoising_steps,
-    )
-
-    reward_end = RewardEndModel(
-        inp_shape=(frame_ch * 2, frame_h, frame_w),
-        inp_proj_ch=cfg.reward_end.inp_proj_ch,
-        channels=cfg.reward_end.channels,
-        final_res_attn_ch=cfg.reward_end.final_res_attn_ch,
-        downsample_after=cfg.reward_end.downsample_after,
-        lstm_dim=cfg.reward_end.lstm_dim,
-        group_size=cfg.reward_end.group_size,
-        num_actions=num_actions,
-        cond_dim=cfg.reward_end.cond_dim,
-        num_heads=cfg.reward_end.num_heads,
     )
 
     actor_critic = ActorCriticModel(
@@ -85,27 +88,19 @@ def build_agent(cfg: Config, env: AbstractEnv) -> Agent:
     )
 
     return Agent(
-        denoiser=denoiser,
+        world_model=world_model,
         next_obs_model=next_obs_model,
-        reward_end=reward_end,
         actor_critic=actor_critic,
     )
 
 
 def build_optimizers(cfg: Config, agent: Agent) -> Optimizers:
-    denoiser_optimizer = ModelOptimizer(
-        model=agent.denoiser,
-        lr=cfg.train.denoiser.lr,
-        weight_decay=cfg.train.denoiser.weight_decay,
-        warmup_steps=cfg.train.denoiser.warmup_steps,
-        max_grad_norm=cfg.train.denoiser.max_grad_norm,
-    )
-    reward_end_optimizer = ModelOptimizer(
-        model=agent.reward_end,
-        lr=cfg.train.reward_end.lr,
-        weight_decay=cfg.train.reward_end.weight_decay,
-        warmup_steps=cfg.train.reward_end.warmup_steps,
-        max_grad_norm=cfg.train.reward_end.max_grad_norm,
+    world_model_optimizer = ModelOptimizer(
+        model=agent.world_model,
+        lr=cfg.train.world_model.lr,
+        weight_decay=cfg.train.world_model.weight_decay,
+        warmup_steps=cfg.train.world_model.warmup_steps,
+        max_grad_norm=cfg.train.world_model.max_grad_norm,
     )
     actor_critic_optimizer = ModelOptimizer(
         model=agent.actor_critic,
@@ -115,7 +110,6 @@ def build_optimizers(cfg: Config, agent: Agent) -> Optimizers:
         max_grad_norm=cfg.train.actor_critic.max_grad_norm,
     )
     return Optimizers(
-        denoiser=denoiser_optimizer,
-        reward_end=reward_end_optimizer,
+        world_model=world_model_optimizer,
         actor_critic=actor_critic_optimizer,
     )

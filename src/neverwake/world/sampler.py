@@ -6,7 +6,7 @@ from neverwake.world.denoiser import Denoiser
 def sampler(
     denoiser: Denoiser,
     obs_ctx_cat: torch.Tensor,
-    actions: torch.Tensor,
+    memory_emb: torch.Tensor,
     obs_shape: tuple[int, int, int],
     rho: float,
     sigma_min_ode: float,
@@ -47,7 +47,7 @@ def sampler(
         delta_t = sigmas[i + 1] - sigmas[i]
 
         current_cond_sigma = sigmas[i].expand(obs_ctx_cat.shape[0])
-        d = 1 / t * (x - denoiser(obs_ctx_cat, x, current_cond_sigma, actions))
+        d = 1 / t * (x - denoiser(obs_ctx_cat, x, current_cond_sigma, memory_emb))
 
         x = x + delta_t * d
 
