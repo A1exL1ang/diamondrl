@@ -82,7 +82,7 @@ class Evaluator:
             actions.append(int(action))
             rewards.append(reward)
             probs.append(policy_logits.softmax(dim=-1).cpu())
-            values.append(value.squeeze(0).cpu())
+            values.append(self.actor_critic.to_return(value).squeeze(0).cpu())
 
             if terminated or truncated:
                 if not info["game_end"]:

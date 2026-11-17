@@ -64,7 +64,11 @@ def build_agent(cfg: Config, env: AbstractEnv) -> Agent:
         sigma_data=cfg.denoiser.sigma_data,
     )
 
-    reward_end = RewardEndModel(memory_dim=cfg.memory.mamba_dim)
+    reward_end = RewardEndModel(
+        memory_dim=cfg.memory.mamba_dim,
+        num_bins=cfg.world.reward_bins,
+        bin_limit=cfg.world.reward_bin_limit,
+    )
 
     world_model = WorldModel(memory=memory, denoiser=denoiser, reward_end=reward_end)
 
@@ -85,6 +89,9 @@ def build_agent(cfg: Config, env: AbstractEnv) -> Agent:
         lstm_dim=cfg.actor_critic.lstm_dim,
         num_actions=num_actions,
         group_size=cfg.actor_critic.group_size,
+        return_percentiles=cfg.train.rl.return_percentiles,
+        return_range_decay=cfg.train.rl.return_range_decay,
+        return_range_min=cfg.train.rl.return_range_min,
     )
 
     return Agent(

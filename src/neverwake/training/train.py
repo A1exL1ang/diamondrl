@@ -161,6 +161,7 @@ def train(
                 loss_world_model, info_world_model = world_model_loss(
                     world_model=state.agent.world_model,
                     seq_batch=seq_batch,
+                    sign_rewards=cfg.world.sign_rewards,
                     ctx_frames=cfg.world.ctx_frames,
                     future_frames=world_model_cfg.future_frames,
                     sigma_min=world_model_cfg.sigma_min,
@@ -200,6 +201,7 @@ def train(
             ).to(device)
 
             loss_actor_critic, info_actor_critic = actor_critic_loss(
+                actor_critic=state.agent.actor_critic,
                 traj=traj,
                 weight_value=cfg.train.rl.weight_value,
                 weight_entropy=cfg.train.rl.weight_entropy,

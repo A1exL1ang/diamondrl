@@ -220,7 +220,9 @@ class Telemetry:
         An imagined rollout for the actor critic, call it before the update so the
         rates land in the same row
         """
-        reward_rate = (traj.rewards[traj.valid] != 0).float().mean()
+        # Note: the mean size of the rewards, since an imagined reward is an expected
+        # value and is almost never exactly 0
+        reward_rate = traj.rewards[traj.valid].abs().mean()
         end_rate = traj.ends[traj.valid].float().mean()
         self.log.add("actor_critic/imagined_reward_rate", reward_rate)
         self.log.add("actor_critic/imagined_end_rate", end_rate)

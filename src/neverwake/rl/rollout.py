@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import torch
 from torch.distributions import Categorical
 
+from neverwake.modules.twohot import twohot_decode
 from neverwake.rl.actor_critic import ActorCriticModel
 from neverwake.world.memory import MemoryModel
 from neverwake.world.next_obs_model import NextObsModel
@@ -13,7 +14,8 @@ from neverwake.world.stepper import BatchedWorldStepper
 @dataclass
 class Trajectory:
     """
-    obs and values have an additional entry for the true final frame
+    obs and values have an additional entry for the true final frame. values are as
+    the critic outputs them (see ActorCriticModel.to_return)
     """
 
     obs: torch.Tensor
@@ -93,8 +95,9 @@ def rollout(
         with torch.no_grad():
             obs_next, reward_logits, end_logits = stepper.step(actions)
 
-        # For rewards map [0, 1, 2] to [-1, 0, +1] by subtracting 1
-        rewards = Categorical(logits=reward_logits).sample() - 1.0
+        # The reward is the expected one (same as DreamerV3) and only the end is
+        # sampled
+        rewards = twohot_decode(reward_logits, reward_end.bins)
         ends = Categorical(logits=end_logits).sample().bool()
 
         # Update and track info

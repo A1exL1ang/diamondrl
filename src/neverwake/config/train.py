@@ -48,6 +48,12 @@ class RLConfig:
     weight_value: float
     weight_entropy: float
 
+    # The running range of the returns, which the critic and the advantages are in
+    # units of
+    return_percentiles: tuple[float, float]  # Its low and high end
+    return_range_decay: float  # How slowly it follows new batches
+    return_range_min: float  # A smaller range counts as this
+
 
 @dataclass
 class EvalConfig:
