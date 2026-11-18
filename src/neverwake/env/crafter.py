@@ -1,3 +1,4 @@
+import math
 from typing import Any
 
 import crafter  # type: ignore[import-untyped]
@@ -44,6 +45,18 @@ class CrafterEnv(AbstractEnv):
     def obs_shape(self) -> tuple[int, int, int]:
         return self.cfg.rescaled_shape
 
+    @property
+    def achievements(self) -> tuple[str, ...]:
+        # Note: the package reads its constants from a data file when it is imported
+        return tuple(crafter.constants.achievements)  # type: ignore[attr-defined]
+
+    def achievement_score(self, success_rates: dict[str, float]) -> float:
+        # The Crafter score (Hafner 2022, "Benchmarking the Spectrum of Agent
+        # Capabilities", arXiv:2109.06780, section 3.3): exp(mean(ln(1 + rate))) - 1
+        # over all 22 achievements, a geometric mean so that rare ones count
+        logs = [math.log1p(success_rates[name]) for name in self.achievements]
+        return math.expm1(sum(logs) / len(logs))
+
     def proc_obs(self, original_obs: np.ndarray) -> torch.Tensor:
         # (h, w, c) --> (c, h, w)
         obs = torch.tensor(original_obs).permute(2, 0, 1).float()
@@ -64,6 +77,11 @@ class CrafterEnv(AbstractEnv):
 
         # Every episode is a single life so it always ends the game
         info["game_end"] = terminated or truncated
+
+        # Crafter counts how often each achievement was reached in this episode
+        info["unlocked"] = [
+            name for name, count in info["achievements"].items() if count > 0
+        ]
 
         return self.proc_obs(self.screen), float(reward), terminated, truncated, info
 

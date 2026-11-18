@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 import torch
 import torch.nn.functional as F
@@ -40,6 +40,7 @@ class Collector:
         self.game_count = 0  # Episode is a life, game is an actual game
         self.episode_count = 0  # Finished only
         self.reward_pos, self.reward_neg = 0, 0
+        self.unlocked_counts: Counter[str] = Counter()  # Games per achievement
 
         self.game_length = defaultdict(int)
         self.game_reward_sum = defaultdict(float)
@@ -103,6 +104,8 @@ class Collector:
                 self.episode_count += 1
 
                 # Determine if the game actually ended
+                if info["game_end"]:
+                    self.unlocked_counts.update(info.get("unlocked", ()))
                 self.game_count += info["game_end"]
 
                 # Reset (make sure to not seed here so it carries from previous seed)

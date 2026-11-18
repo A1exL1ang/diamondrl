@@ -1,4 +1,5 @@
 import json
+from collections import Counter
 from dataclasses import fields
 from pathlib import Path
 from typing import Any
@@ -77,6 +78,7 @@ class Checkpointer:
                 "game_count": self.collector.game_count,
                 "reward_pos": self.collector.reward_pos,
                 "reward_neg": self.collector.reward_neg,
+                "unlocked_counts": dict(self.collector.unlocked_counts),
             },
             # Telemetry
             "counters": self.tel.counters(epoch),
@@ -158,6 +160,7 @@ def restore(
     collector.game_count = checkpoint["collector"]["game_count"]
     collector.reward_pos = checkpoint["collector"]["reward_pos"]
     collector.reward_neg = checkpoint["collector"]["reward_neg"]
+    collector.unlocked_counts = Counter(checkpoint["collector"]["unlocked_counts"])
     collector.episode_count = len(episodes)
 
 

@@ -31,6 +31,32 @@ class AbstractEnv(ABC):
             Size of observation
         """
 
+    @property
+    def achievements(self) -> tuple[str, ...]:
+        """
+        Returns the names of the achievements a game can unlock. An env that has any
+        must list the ones unlocked so far in info["unlocked"] on every step, and
+        define achievement_score.
+
+        Returns:
+            Every achievement (none unless the env overrides this)
+        """
+        return ()
+
+    def achievement_score(self, success_rates: dict[str, float]) -> float:
+        """
+        Sums up how often each achievement is unlocked in one number, the way this
+        env's benchmark defines it.
+
+        Args:
+            success_rates: For every achievement, the percentage of games that
+                unlocked it.
+
+        Returns:
+            The score
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def step(
         self, action: int

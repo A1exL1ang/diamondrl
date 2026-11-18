@@ -310,6 +310,18 @@ class Telemetry:
         self.games_logged = collector.game_count
         self.log.add("collect/lives", collector.episode_count, "last")
 
+        # How often each achievement is unlocked, for envs that have any
+        names = collector.env.achievements
+        if names and collector.game_count > 0:
+            rates = {
+                name: 100 * collector.unlocked_counts[name] / collector.game_count
+                for name in names
+            }
+            for name, rate in rates.items():
+                self.log.add(f"collect/success_{name}", rate, "last")
+            score = collector.env.achievement_score(rates)
+            self.log.add("collect/achievement_score", score, "last")
+
     def record_eval(self, kind: str, num_games: int) -> None:
         summary = self.evaluator.evaluate(num_games)
         for ret, length in zip(summary.returns, summary.lengths, strict=True):
