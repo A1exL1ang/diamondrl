@@ -161,7 +161,6 @@ def train(
                 loss_world_model, info_world_model = world_model_loss(
                     world_model=state.agent.world_model,
                     seq_batch=seq_batch,
-                    sign_rewards=cfg.world.sign_rewards,
                     ctx_frames=cfg.world.ctx_frames,
                     future_frames=world_model_cfg.future_frames,
                     sigma_min=world_model_cfg.sigma_min,

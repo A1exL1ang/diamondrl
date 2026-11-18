@@ -43,7 +43,6 @@ actor_critic:
 world:
   ctx_frames: 4
   horizon: 15
-  sign_rewards: true
   reward_bins: 255
   reward_bin_limit: 20.0
 

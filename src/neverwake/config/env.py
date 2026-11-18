@@ -20,27 +20,5 @@ class AtariEnvConfig(EnvConfig):
 
 
 @dataclass
-class MarioForwardRewL1EnvConfig(EnvConfig):
+class CrafterEnvConfig(EnvConfig):
     rescaled_shape: tuple[int, int, int]
-    max_noop: int
-    frameskip: int
-    block_size: int  # Pixels of rightward progress per +1 reward
-
-
-@dataclass
-class DoomHpSupBinRewEnvConfig(EnvConfig):
-    rescaled_shape: tuple[int, int, int]
-    frameskip: int
-
-
-@dataclass
-class DoomDeathmatchKillRewEnvConfig(EnvConfig):
-    rescaled_shape: tuple[int, int, int]
-    frameskip: int
-
-
-@dataclass
-class CraftaxClassicAchRewEnvConfig(EnvConfig):
-    rescaled_shape: tuple[int, int, int]
-    always_day: bool  # Light stays at the episode's starting level, so no night
-    health_penalty: bool  # -1 on any step that loses health

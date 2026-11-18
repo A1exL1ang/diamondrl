@@ -1,12 +1,8 @@
 seed: 42
 
 env:
-  type: atari
-  game: Freeway
+  type: crafter
   rescaled_shape: [3, 64, 64]
-  episodic_life: true
-  max_noop: 30
-  frameskip: 4
 
 denoiser:
   inp_proj_ch: 64
@@ -43,7 +39,6 @@ actor_critic:
 world:
   ctx_frames: 4
   horizon: 15
-  sign_rewards: true
   reward_bins: 255
   reward_bin_limit: 20.0
 
@@ -53,12 +48,12 @@ train:
 
   collection:
     eps: 0.01
-    temperature: 0.01
+    temperature: 1.0
     init_min_env_steps: 5000
     init_max_env_steps: 10000
     init_min_reward_steps: 10
-    env_steps_per_epoch: 100
-    total_env_steps: 100000
+    env_steps_per_epoch: 1000
+    total_env_steps: 1000000
 
   world_model:
     steps_init: 10000
@@ -84,7 +79,7 @@ train:
     max_grad_norm: 100.0
 
   rl:
-    gamma: 0.985
+    gamma: 0.997
     lamb: 0.95
     weight_value: 1.0
     weight_entropy: 0.001

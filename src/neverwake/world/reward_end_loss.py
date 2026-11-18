@@ -10,12 +10,10 @@ def reward_end_loss(
     reward_end: RewardEndModel,
     seq_batch: MaskedSequenceBatch,
     memory_emb: torch.Tensor,
-    sign_rewards: bool,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
     memory_emb: (B, L, memory_dim) where entry t has seen frames and actions 0..t, so
                 it predicts the reward and end of transition t
-    sign_rewards: learn the sign of the reward and not its size (Atari)
 
     Returns the reward loss and the end loss, kept apart since the world model loss
     weights them differently
@@ -24,8 +22,6 @@ def reward_end_loss(
     num_valid = valid_mask_flat.sum().clamp_min(1.0)
 
     reward_target_flat = seq_batch.rewards.flatten()
-    if sign_rewards:
-        reward_target_flat = reward_target_flat.sign()
     end_target_flat = seq_batch.terminations.flatten().long()
 
     # Forward

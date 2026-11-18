@@ -9,7 +9,6 @@ from neverwake.world.world_model import WorldModel
 def world_model_loss(
     world_model: WorldModel,
     seq_batch: MaskedSequenceBatch,
-    sign_rewards: bool,
     ctx_frames: int,
     future_frames: int,
     sigma_min: float,
@@ -30,7 +29,7 @@ def world_model_loss(
     memory_emb = world_model.memory(seq_batch.obs_stack[:, :-1, ...], seq_batch.actions)
 
     loss_reward, loss_end = reward_end_loss(
-        world_model.reward_end, seq_batch, memory_emb, sign_rewards
+        world_model.reward_end, seq_batch, memory_emb
     )
     loss_denoiser, info_denoiser = denoiser_loss(
         denoiser=world_model.denoiser,

@@ -52,7 +52,6 @@ class ActorCriticConfig:
 class WorldConfig:
     ctx_frames: int
     horizon: int
-    sign_rewards: bool  # Learn the sign of the reward and not its size (Atari)
     reward_bins: int  # Bins of the twohot reward head (odd)
     reward_bin_limit: float  # Their largest value is e^limit - 1
 

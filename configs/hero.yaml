@@ -2,7 +2,7 @@ seed: 42
 
 env:
   type: atari
-  game: Boxing
+  game: Hero
   rescaled_shape: [3, 64, 64]
   episodic_life: true
   max_noop: 30
@@ -43,7 +43,6 @@ actor_critic:
 world:
   ctx_frames: 4
   horizon: 15
-  sign_rewards: true
   reward_bins: 255
   reward_bin_limit: 20.0
 

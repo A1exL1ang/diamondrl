@@ -34,7 +34,7 @@ def train_remote(config: str) -> None:
 
 
 @app.local_entrypoint()
-def main(config: str = "configs/smoke.yaml") -> None:
+def main(config: str) -> None:
     # Note that a spawned call isn't tied to this process, so with --detach training
     # keeps going even if this terminal is closed or killed
     call = train_remote.spawn(config)

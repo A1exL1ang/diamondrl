@@ -1,11 +1,12 @@
 seed: 42
 
 env:
-  type: mario_forward_rew_l1
-  rescaled_shape: [3, 84, 84]
+  type: atari
+  game: BankHeist
+  rescaled_shape: [3, 64, 64]
+  episodic_life: true
   max_noop: 30
   frameskip: 4
-  block_size: 16
 
 denoiser:
   inp_proj_ch: 64
@@ -42,7 +43,6 @@ actor_critic:
 world:
   ctx_frames: 4
   horizon: 15
-  sign_rewards: true
   reward_bins: 255
   reward_bin_limit: 20.0
 
